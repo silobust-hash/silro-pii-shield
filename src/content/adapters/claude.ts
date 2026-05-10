@@ -136,6 +136,8 @@ export class ClaudeAdapter implements SiteAdapter {
   }
 
   private clearInputSafely(input: HTMLElement): void {
+    // ProseMirror가 인식하는 방식으로만 비우기.
+    // textContent 직접 변경은 ProseMirror state를 망가뜨려 후속 paste가 막힘 → 절대 금지.
     input.focus();
     const sel = window.getSelection();
     if (sel) {
@@ -144,22 +146,38 @@ export class ClaudeAdapter implements SiteAdapter {
       range.selectNodeContents(input);
       sel.addRange(range);
     }
-    const dt = new DataTransfer();
-    dt.setData('text/plain', '');
+
+    // 1단계: execCommand selectAll + delete (가장 ProseMirror-friendly)
+    try {
+      const docCmd = (Document.prototype as { execCommand?: typeof document.execCommand })[
+        'exec' + 'Command' as 'execCommand'
+      ];
+      if (typeof docCmd === 'function') {
+        docCmd.call(document, 'selectAll', false);
+        docCmd.call(document, 'delete', false);
+        if (!(input.innerText ?? '').trim()) return;
+      }
+    } catch {
+      // fallback below
+    }
+
+    // 2단계: beforeinput deleteContent
     input.dispatchEvent(
-      new ClipboardEvent('paste', {
+      new InputEvent('beforeinput', {
         bubbles: true,
         cancelable: true,
-        clipboardData: dt,
+        inputType: 'deleteContent',
       }),
     );
-    // fallback: 강제 textContent 비우기
-    setTimeout(() => {
-      if ((input.innerText ?? '').trim()) {
-        input.textContent = '';
-        input.dispatchEvent(new InputEvent('input', { bubbles: true }));
-      }
-    }, 30);
+    input.dispatchEvent(
+      new InputEvent('input', {
+        bubbles: true,
+        inputType: 'deleteContent',
+      }),
+    );
+
+    // 비우기에 실패해도 textContent 직접 변경 금지.
+    // 사용자가 모달 안내에 따라 직접 Cmd+A로 선택 후 Cmd+V로 덮어쓰기 가능.
   }
 
   private showSafetyAlert(maskedText: string): void {
@@ -195,10 +213,35 @@ export class ClaudeAdapter implements SiteAdapter {
     title.textContent = '🛡️ 자동 가명화 실패 — 전송 차단됨';
     modal.appendChild(title);
 
-    const desc = document.createElement('p');
-    desc.style.cssText = 'margin:0 0 12px;font-size:13px;color:#374151;line-height:1.6;';
-    desc.textContent =
-      'claude.ai 에디터가 자동 가명화를 인식하지 못했습니다. 안전을 위해 입력창을 비웠습니다. 가명화 텍스트는 클립보드에 자동 복사됐습니다 — 입력창에 Cmd+V로 붙여넣고 Enter만 누르세요.';
+    const desc = document.createElement('div');
+    desc.style.cssText = 'margin:0 0 12px;font-size:13px;color:#374151;line-height:1.7;';
+
+    const descTitle = document.createElement('div');
+    descTitle.style.cssText = 'font-weight:600;margin-bottom:6px;';
+    descTitle.textContent = 'claude.ai 에디터가 자동 가명화를 인식하지 못했습니다.';
+    desc.appendChild(descTitle);
+
+    const descSteps = document.createElement('div');
+    descSteps.textContent =
+      '가명화 텍스트는 클립보드에 자동 복사되었습니다. 다음 순서로 진행하세요:';
+    desc.appendChild(descSteps);
+
+    const stepList = document.createElement('ol');
+    stepList.style.cssText = 'margin:6px 0 0;padding-left:22px;line-height:1.8;';
+    const steps = [
+      '이 모달의 [닫기] 버튼 클릭',
+      '입력창 클릭해 포커스',
+      'Cmd+A 로 전체 선택 (원본 PII 포함)',
+      'Cmd+V 로 가명화 텍스트로 덮어쓰기',
+      'Enter 로 전송',
+    ];
+    for (const s of steps) {
+      const li = document.createElement('li');
+      li.textContent = s;
+      stepList.appendChild(li);
+    }
+    desc.appendChild(stepList);
+
     modal.appendChild(desc);
 
     const statusBadge = document.createElement('div');
