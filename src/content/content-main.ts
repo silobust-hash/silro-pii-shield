@@ -117,6 +117,22 @@ const INPUT_SELECTORS: Record<string, string> = {
     if (decision === 'cancel') {
       throw new Error('User cancelled');
     }
+
+    // 매핑 패널을 응답 도착 전에 미리 표시 (observeResponses 의존성 제거)
+    void (async () => {
+      try {
+        const mappings = await sendMessage<Mapping[]>({
+          type: 'GET_MAPPINGS',
+          conversationId,
+        });
+        if (mappings && mappings.length > 0) {
+          showMappingPanel(mappings);
+        }
+      } catch (err) {
+        console.warn('[pii-shield] failed to show mapping panel', err);
+      }
+    })();
+
     return finalMasked;
   });
 

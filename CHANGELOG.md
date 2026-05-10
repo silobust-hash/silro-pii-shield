@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.0.1] - 2026-05-10 (claude.ai live-test hotfixes)
+
+실제 claude.ai 라이브 테스트에서 발견된 ProseMirror 통합 이슈 7건 핫픽스.
+
+### Fixed
+- **Submit 버튼 셀렉터 미스매치** (`be11f64`): 단일 `button[aria-label*="Send"]`에서 8개 fallback 셀렉터로 확장 (Send/send/보내기/message/type=submit/svg-button)
+- **ProseMirror paste 시뮬레이션** (`c66bbbe`): textContent 직접 변경은 React state 미반영 → ClipboardEvent('paste') + DataTransfer로 시뮬레이션
+- **마스킹 정착 검증 + 안전 차단** (`ed4652c`): 200ms 후 input.innerText 검증, 빈 상태/원본 그대로/부분 정착 시 입력창 강제 비우기 + 안전 알림 모달
+- **4-tier ProseMirror fallback** (`eb1ddbf`): execCommand → paste → beforeinput → textContent 순서로 정착 시도, 각 단계 검증, 정착률 대폭 향상
+- **ProseMirror state 보호** (`af65808`): clearInputSafely가 textContent 직접 변경 사용 → ProseMirror state 망가짐 → 후속 Cmd+V까지 막힘 → execCommand selectAll+delete만 사용으로 변경
+- **클립보드 다중 fallback** (`24162bb`): navigator.clipboard.writeText 실패 시 execCommand('copy') 자동 fallback, textarea 자동 select로 사용자 Cmd+C도 즉시 가능
+
+### Added
+- **자동 매핑 패널** (`2ca9318`): 응답에 가명 발견 시 화면 우측 상단에 매핑 표 자동 표시 (React 재렌더링 fallback UX), 4초 cooldown
+- **한글 이름 휴리스틱 강화** (`eb1ddbf`):
+  - CONTEXT_PREFIXES 신설 (의뢰인/원고/피고/근로자/대표/노무사 등 +0.25~0.4)
+  - CONTEXT_SUFFIXES 추가 (괄호+주민번호 +0.4, 괄호+생년월일 +0.3)
+  - "의뢰인 홍길동(900101...)" 패턴 confidence 0.4 → 1.0(clamp) → 자동 마스킹
+
+### Security
+- **시나리오 B 안전망**: 자동 가명화 실패 시에도 PII 유출 0% 보장 — 입력창 비우기 + 모달 강제 표시 + 클립보드 자동 복사
+- **5단계 사용자 가이드**: 시나리오 B 모달에 명확한 복구 절차 안내 (모달 닫기 → 입력창 클릭 → Cmd+A → Cmd+V → Enter)
+
+### Known Limitations
+- 시나리오 B로 빠지는 빈도는 claude.ai 빌드/세션 상태에 따라 가변적 (대부분 시나리오 A 정상 작동)
+- 응답 영역 매핑 패널 표시 여부는 MutationObserver 셀렉터 매치 결과에 의존
+
 ## [1.0.0] - 2026-05-10
 
 ### Added
