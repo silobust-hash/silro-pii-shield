@@ -166,6 +166,9 @@ export interface FileProcessResult {
   reconstructedFileName?: string;     // 예: original.docx → original_masked.docx
   reconstructedMimeType?: string;
   errorMessage?: string;
+  // v0.6: OCR 신뢰도 게이트
+  requiresConfirm?: boolean;    // true → Preflight에서 사용자 confirm 필요
+  ocrConfidence?: number;       // 0.0-1.0 (OCR 처리 파일에만 존재)
 }
 
 /** 파일별 재생성 설정 */

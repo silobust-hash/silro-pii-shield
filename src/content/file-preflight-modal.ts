@@ -22,6 +22,26 @@ export async function showFilePreflightModal(result: FileProcessResult): Promise
       'max-width:600px;width:90%;max-height:80vh;overflow-y:auto;' +
       'box-shadow:0 10px 40px rgba(0,0,0,0.2);';
 
+    // v0.6: OCR 신뢰도 낮음 경고 (requiresConfirm = true)
+    if (result.requiresConfirm) {
+      const warning = document.createElement('div');
+      warning.className = 'pii-ocr-warning';
+      warning.style.cssText =
+        'background:#fefce8;border:1px solid #fde047;border-radius:6px;' +
+        'padding:10px 12px;margin-bottom:12px;font-size:13px;color:#854d0e;' +
+        'display:flex;align-items:center;gap:8px;';
+      const icon = document.createElement('span');
+      icon.textContent = '⚠ OCR 인식률 낮음 (';
+      const pct = document.createElement('strong');
+      pct.textContent = `${Math.round((result.ocrConfidence ?? 0) * 100)}%`;
+      const msg = document.createElement('span');
+      msg.textContent = '). 추출된 텍스트를 직접 확인해 주세요.';
+      warning.appendChild(icon);
+      warning.appendChild(pct);
+      warning.appendChild(msg);
+      modal.prepend(warning);
+    }
+
     // 제목
     const title = document.createElement('h2');
     title.style.cssText = 'margin:0 0 12px;font-size:18px;';

@@ -5,7 +5,7 @@ import { XlsxHandler } from './xlsx-handler';
 import { PdfHandler } from './pdf-handler';
 import { PptxHandler } from './pptx-handler';
 import { HwpHandler, HwpUnsupportedError } from './hwp-handler';
-import { ImageHandler } from './image-handler';
+import { ImageHandler, type ImageExtractionResult } from './image-handler';
 import type { FileHandler, ReconstructedFile } from './base';
 import { ParseError } from './base';
 import type { Mapping, ReconstructionMode, FileInterceptEvent, FileProcessResult } from '@/shared/types';
@@ -69,8 +69,16 @@ export async function dispatchFileProcessing(
 
   // 텍스트 추출
   let rawText: string;
+  let imageOcrResult: ImageExtractionResult | null = null;
+
   try {
-    rawText = await handler.extractText(arrayBuffer);
+    // 이미지 핸들러: OCR 상세 결과(신뢰도)를 별도로 수집
+    if (handler instanceof ImageHandler) {
+      imageOcrResult = await handler.extractImageResult(arrayBuffer, mimeType);
+      rawText = imageOcrResult.text;
+    } else {
+      rawText = await handler.extractText(arrayBuffer);
+    }
   } catch (err) {
     // HWP 미지원 에러는 'unsupported' 상태로 반환 (parse_error 아님)
     if (err instanceof HwpUnsupportedError) {
@@ -121,5 +129,8 @@ export async function dispatchFileProcessing(
     reconstructedBuffer: reconstructed.buffer,
     reconstructedFileName: reconstructed.fileName,
     reconstructedMimeType: reconstructed.mimeType,
+    // v0.6: OCR 신뢰도 게이트 플래그 전파
+    requiresConfirm: imageOcrResult?.requiresConfirm ?? false,
+    ocrConfidence: imageOcrResult?.ocrConfidence,
   };
 }
