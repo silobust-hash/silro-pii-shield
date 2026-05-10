@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.4.0] - 2026-05-10
+
+### Added
+- 파일 첨부 자동 가로채기 (DOCX/XLSX/PDF 텍스트형)
+- FileHandler 인터페이스 + DocxHandler / XlsxHandler / PdfHandler
+- FormatDetector: MIME + magic bytes 기반 포맷 감지
+- FileDispatcher: 파일 처리 파이프라인 통합 라우팅
+- Upload Interceptor: fetch + XMLHttpRequest monkey-patch
+- 사이트별 파일 업로드 endpoint 매처 (4개 사이트)
+- Preflight Modal 확장: 파일 프리뷰 + PII 목록
+- Options Page: 재생성 모드 설정 (txt / preserve)
+- Fail-Safe: 100MB 초과 차단, 미지원 형식 차단, 파싱 실패 차단
+- 테스트 픽스처 헬퍼 (런타임 생성, 바이너리 git 커밋 없음)
+
+### Dependencies Added
+- `mammoth`: DOCX 텍스트 추출
+- `docx`: DOCX 재생성 (원본 포맷 유지)
+- `xlsx` (SheetJS): XLSX 추출·셀 레벨 재생성
+- `pdfjs-dist`: PDF 텍스트 추출
+
+### Security
+- 모든 파일 처리 브라우저 내 완결 (외부 서버 송신 0)
+- DOCX 재생성: ZIP 직접 조작 방식 (서식·이미지·표 보존)
+- PDF: txt 변환만 지원 (원본 포맷 재생성 불가)
+- innerHTML/insertAdjacentHTML/outerHTML 사용 0건 (텍스트 PII 모달과 동일)
+
+### Known Limitations
+- Gemini GCS signed URL 패턴은 DevTools 검증 필요 (v0.4 spike 항목)
+- PPTX/HWP 지원 없음 — v0.5 예정
+- OCR (이미지→텍스트 PII 감지) 없음 — v0.6 예정
+
 ## [0.3.0] - 2026-05-10
 
 ### Added
