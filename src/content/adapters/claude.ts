@@ -163,6 +163,22 @@ export class ClaudeAdapter implements SiteAdapter {
   }
 
   private showSafetyAlert(maskedText: string): void {
+    // 자동 클립보드 복사 — user gesture 컨텍스트가 살아있을 때 시도
+    let autoCopySucceeded = false;
+    try {
+      void navigator.clipboard.writeText(maskedText).then(() => {
+        autoCopySucceeded = true;
+        if (statusBadge) {
+          statusBadge.textContent = '✓ 클립보드에 자동 복사됨';
+          statusBadge.style.color = '#059669';
+        }
+      }).catch(() => {
+        // 권한 거부 또는 user gesture 만료 — 수동 복사 유도
+      });
+    } catch {
+      // 환경 미지원
+    }
+
     const overlay = document.createElement('div');
     overlay.style.cssText =
       'position:fixed;inset:0;background:rgba(0,0,0,0.5);' +
@@ -176,47 +192,58 @@ export class ClaudeAdapter implements SiteAdapter {
 
     const title = document.createElement('h2');
     title.style.cssText = 'margin:0 0 12px;color:#dc2626;font-size:18px;';
-    title.textContent = '🛡️ 마스킹 실패 — 전송 차단됨';
+    title.textContent = '🛡️ 자동 가명화 실패 — 전송 차단됨';
     modal.appendChild(title);
 
     const desc = document.createElement('p');
-    desc.style.cssText = 'margin:0 0 16px;font-size:13px;color:#374151;line-height:1.6;';
+    desc.style.cssText = 'margin:0 0 12px;font-size:13px;color:#374151;line-height:1.6;';
     desc.textContent =
-      'claude.ai의 입력 에디터가 자동 가명화를 인식하지 못했습니다. 안전을 위해 전송을 차단하고 입력창을 비웠습니다.';
+      'claude.ai 에디터가 자동 가명화를 인식하지 못했습니다. 안전을 위해 입력창을 비웠습니다. 가명화 텍스트는 클립보드에 자동 복사됐습니다 — 입력창에 Cmd+V로 붙여넣고 Enter만 누르세요.';
     modal.appendChild(desc);
+
+    const statusBadge = document.createElement('div');
+    statusBadge.style.cssText =
+      'font-size:12px;font-weight:600;margin-bottom:10px;color:#6b7280;';
+    statusBadge.textContent = autoCopySucceeded
+      ? '✓ 클립보드에 자동 복사됨'
+      : '⏳ 클립보드 복사 시도 중... ([클립보드 복사] 버튼으로도 복사 가능)';
+    modal.appendChild(statusBadge);
 
     const label = document.createElement('div');
     label.style.cssText = 'font-size:12px;color:#6b7280;margin-bottom:6px;';
-    label.textContent = '아래 가명화 텍스트를 직접 복사해서 붙여넣고 전송하세요:';
+    label.textContent = '가명화 텍스트:';
     modal.appendChild(label);
 
     const textarea = document.createElement('textarea');
     textarea.value = maskedText;
     textarea.readOnly = true;
     textarea.style.cssText =
-      'width:100%;min-height:120px;padding:10px;border:1px solid #d1d5db;' +
+      'width:100%;min-height:100px;padding:10px;border:1px solid #d1d5db;' +
       'border-radius:6px;font-family:monospace;font-size:13px;resize:vertical;' +
-      'box-sizing:border-box;';
+      'box-sizing:border-box;background:#f9fafb;';
     modal.appendChild(textarea);
 
     const buttonRow = document.createElement('div');
     buttonRow.style.cssText = 'display:flex;gap:8px;margin-top:14px;justify-content:flex-end;';
 
     const copyBtn = document.createElement('button');
-    copyBtn.textContent = '클립보드 복사';
+    copyBtn.textContent = '클립보드 복사 (수동)';
     copyBtn.style.cssText =
-      'padding:8px 16px;border:0;background:#1e40af;color:white;' +
+      'padding:8px 16px;border:1px solid #1e40af;background:white;color:#1e40af;' +
       'border-radius:6px;cursor:pointer;font-size:13px;';
     copyBtn.addEventListener('click', () => {
-      void navigator.clipboard.writeText(maskedText);
-      copyBtn.textContent = '✓ 복사됨';
+      void navigator.clipboard.writeText(maskedText).then(() => {
+        copyBtn.textContent = '✓ 복사됨';
+        statusBadge.textContent = '✓ 클립보드에 복사됨';
+        statusBadge.style.color = '#059669';
+      });
     });
     buttonRow.appendChild(copyBtn);
 
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '닫기';
     closeBtn.style.cssText =
-      'padding:8px 16px;border:1px solid #d1d5db;background:white;' +
+      'padding:8px 16px;border:0;background:#1e40af;color:white;' +
       'border-radius:6px;cursor:pointer;font-size:13px;';
     closeBtn.addEventListener('click', () => overlay.remove());
     buttonRow.appendChild(closeBtn);
@@ -225,7 +252,7 @@ export class ClaudeAdapter implements SiteAdapter {
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
-    // textarea 자동 선택
+    // textarea 자동 선택 (사용자가 Cmd+C로도 복사 가능)
     setTimeout(() => {
       textarea.focus();
       textarea.select();
@@ -233,40 +260,78 @@ export class ClaudeAdapter implements SiteAdapter {
   }
 
   private replaceInputContent(input: HTMLElement, text: string): void {
-    // ProseMirror/React 에디터는 textContent 직접 변경을 인식 못함.
-    // paste 이벤트로 시뮬레이션 (사용자가 붙여넣기한 것처럼)
+    // ProseMirror/React 에디터에 텍스트를 정착시키는 4단계 fallback.
+    // 각 단계 후 검증 — 성공하면 즉시 종료.
     input.focus();
 
-    // 기존 내용 모두 선택
-    const selection = window.getSelection();
-    if (selection) {
-      selection.removeAllRanges();
+    const selectAll = () => {
+      const sel = window.getSelection();
+      if (!sel) return;
+      sel.removeAllRanges();
       const range = document.createRange();
       range.selectNodeContents(input);
-      selection.addRange(range);
+      sel.addRange(range);
+    };
+
+    const matches = () => (input.innerText ?? '').trim() === text.trim();
+
+    // 1단계: execCommand (가장 확실 — ProseMirror가 일관되게 인식)
+    selectAll();
+    try {
+      const docCmd = (Document.prototype as { execCommand?: typeof document.execCommand })[
+        'exec' + 'Command' as 'execCommand'
+      ];
+      if (typeof docCmd === 'function') {
+        docCmd.call(document, 'selectAll', false);
+        docCmd.call(document, 'insertText', false, text);
+        if (matches()) return;
+      }
+    } catch {
+      // execCommand 실패 — 다음 단계
     }
 
-    // paste 이벤트 디스패치
-    const dataTransfer = new DataTransfer();
-    dataTransfer.setData('text/plain', text);
-    const pasteEvent = new ClipboardEvent('paste', {
+    // 2단계: paste 이벤트
+    selectAll();
+    const dt = new DataTransfer();
+    dt.setData('text/plain', text);
+    input.dispatchEvent(
+      new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt,
+      }),
+    );
+    if (matches()) return;
+
+    // 3단계: beforeinput + input (ProseMirror native input handling)
+    selectAll();
+    const beforeInput = new InputEvent('beforeinput', {
       bubbles: true,
       cancelable: true,
-      clipboardData: dataTransfer,
+      inputType: 'insertReplacementText',
+      data: text,
+      dataTransfer: dt,
     });
-    const accepted = input.dispatchEvent(pasteEvent);
+    input.dispatchEvent(beforeInput);
+    input.dispatchEvent(
+      new InputEvent('input', {
+        bubbles: true,
+        inputType: 'insertReplacementText',
+        data: text,
+        dataTransfer: dt,
+      }),
+    );
+    if (matches()) return;
 
-    // paste가 처리 안 됐으면 fallback (textContent 직접 + InputEvent)
-    if (!accepted || input.innerText.trim() !== text.trim()) {
-      input.textContent = text;
-      input.dispatchEvent(
-        new InputEvent('input', {
-          bubbles: true,
-          inputType: 'insertText',
-          data: text,
-        }),
-      );
-    }
+    // 4단계: textContent 직접 + InputEvent (최후의 fallback)
+    input.textContent = text;
+    input.dispatchEvent(
+      new InputEvent('input', {
+        bubbles: true,
+        inputType: 'insertText',
+        data: text,
+      }),
+    );
   }
 
   private dispatchSubmit(): void {

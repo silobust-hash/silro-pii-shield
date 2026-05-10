@@ -15,7 +15,23 @@ const CONTEXT_SUFFIXES: readonly { pattern: RegExp; boost: number }[] = [
   { pattern: /^씨/u, boost: 0.3 },
   { pattern: /^님이|^님은|^님을|^님과|^님의/u, boost: 0.3 },
   { pattern: /^님/u, boost: 0.25 },
+  // 노무 실무: 이름(주민번호) 또는 이름(생년월일) 패턴
+  { pattern: /^\(\d{6}-?\d/u, boost: 0.4 },
+  { pattern: /^\(\d{4}\./u, boost: 0.3 },
   { pattern: /^[이은는을를과와의도만]/u, boost: 0.15 },
+];
+
+/**
+ * Context prefixes (앞 단어). 노무·법률 실무 호칭·역할.
+ * 매칭 시 이름 confidence를 강화.
+ */
+const CONTEXT_PREFIXES: readonly { pattern: RegExp; boost: number }[] = [
+  // 사건 관계인
+  { pattern: /(?:의뢰인|신청인|진정인|피해자|피의자|피고인|피고|원고|채권자|채무자|상대방|당사자|근로자|사용자|대표자)\s*$/u, boost: 0.4 },
+  // 직책·직위
+  { pattern: /(?:대표|이사|사장|부장|차장|과장|대리|주임|팀장|실장|소장|원장|팀원|직원)\s*$/u, boost: 0.25 },
+  // 경어
+  { pattern: /(?:노무사|변호사|법무사|회계사|세무사|판사|검사|선생님?)\s*$/u, boost: 0.25 },
 ];
 
 /**
@@ -151,10 +167,19 @@ export function detectKoreanNames(
         }
       }
 
-      // Quoted context boost
-      const prefix = text.slice(Math.max(0, nameStart - 3), nameStart);
-      if (/["'「『【（(]$/u.test(prefix)) {
+      // Quoted context boost (전 3자)
+      const shortPrefix = text.slice(Math.max(0, nameStart - 3), nameStart);
+      if (/["'「『【（(]$/u.test(shortPrefix)) {
         confidence = Math.min(1.0, confidence + 0.1);
+      }
+
+      // 노무·법률 실무 prefix boost (전 12자, 호칭/역할/경어)
+      const longPrefix = text.slice(Math.max(0, nameStart - 12), nameStart);
+      for (const ctx of CONTEXT_PREFIXES) {
+        if (ctx.pattern.test(longPrefix)) {
+          confidence = Math.min(1.0, confidence + ctx.boost);
+          break;
+        }
       }
 
       // Only emit if confidence meets minimum threshold
