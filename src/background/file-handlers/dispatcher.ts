@@ -5,6 +5,7 @@ import { XlsxHandler } from './xlsx-handler';
 import { PdfHandler } from './pdf-handler';
 import { PptxHandler } from './pptx-handler';
 import { HwpHandler, HwpUnsupportedError } from './hwp-handler';
+import { ImageHandler } from './image-handler';
 import type { FileHandler, ReconstructedFile } from './base';
 import { ParseError } from './base';
 import type { Mapping, ReconstructionMode, FileInterceptEvent, FileProcessResult } from '@/shared/types';
@@ -15,6 +16,7 @@ const HANDLERS: FileHandler[] = [
   new PdfHandler(),
   new PptxHandler(),
   new HwpHandler(),
+  new ImageHandler(),
 ];
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
