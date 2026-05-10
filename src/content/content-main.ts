@@ -177,7 +177,59 @@ const INPUT_SELECTORS: Record<string, string> = {
     });
   }
   // Hybrid 모드: 사이드패널에서 수동 복원 (observeResponses 등록 안 함)
+
+  // v1.0: Keyboard shortcut message handlers
+  chrome.runtime.onMessage.addListener((message: { type: string }) => {
+    if (message.type === 'TRIGGER_PREVIEW') {
+      triggerPreflightModal(adapter);
+    }
+    if (message.type === 'OPEN_PROFILE_SWITCHER') {
+      openProfileSwitcher();
+    }
+  });
 })();
+
+/** v1.0: Trigger preflight modal from keyboard shortcut */
+function triggerPreflightModal(adapter: SiteAdapter): void {
+  const hostname = location.hostname.replace(/^www\./, '');
+  const selector = INPUT_SELECTORS[hostname] ?? 'textarea';
+  const inputEl = document.querySelector<HTMLElement>(selector);
+  if (!inputEl) return;
+  const text = inputEl.textContent ?? (inputEl as HTMLInputElement).value ?? '';
+  if (!text.trim()) return;
+  const conversationId = adapter.getConversationId();
+  void (async () => {
+    try {
+      const result = await sendMessage<MaskResult>({
+        type: 'MASK_TEXT',
+        conversationId,
+        text,
+      });
+      await showPreflight({
+        original: text,
+        masked: result.masked,
+        mappings: result.mappings,
+      });
+    } catch (err) {
+      console.warn('[pii-shield] triggerPreflightModal error', err);
+    }
+  })();
+}
+
+/** v1.0: Open profile switcher panel (side panel focus) */
+function openProfileSwitcher(): void {
+  // Side panel is opened by the service worker via chrome.sidePanel.open().
+  // Content script notifies user with a brief toast.
+  const toast = document.createElement('div');
+  toast.style.cssText =
+    'position:fixed;bottom:24px;right:24px;z-index:2147483647;' +
+    'background:#1e40af;color:white;padding:10px 16px;border-radius:8px;' +
+    'font-family:-apple-system,sans-serif;font-size:13px;' +
+    'box-shadow:0 4px 12px rgba(0,0,0,0.25);';
+  toast.textContent = '[PII Shield] 프로필 패널을 확인하세요.';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
 
 /** 파일 처리 경고 토스트 표시 */
 function showFileWarningToast(message: string): void {

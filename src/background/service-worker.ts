@@ -81,6 +81,27 @@ async function handleFileIntercept(event: FileInterceptEvent): Promise<FileProce
   );
 }
 
+// Keyboard shortcut handlers (v1.0)
+chrome.commands.onCommand.addListener(async (command) => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+
+  switch (command) {
+    case 'preview-masking':
+      await chrome.tabs.sendMessage(tab.id, { type: 'TRIGGER_PREVIEW' });
+      break;
+    case 'toggle-side-panel':
+      await chrome.sidePanel.open({ tabId: tab.id }).catch(async () => {
+        await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false });
+        await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true });
+      });
+      break;
+    case 'switch-profile':
+      await chrome.tabs.sendMessage(tab.id, { type: 'OPEN_PROFILE_SWITCHER' });
+      break;
+  }
+});
+
 chrome.runtime.onMessage.addListener(
   (message: MessageType, _sender, sendResponse: (r: MessageResponse) => void) => {
     (async () => {
