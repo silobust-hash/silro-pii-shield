@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.5.0] - 2026-05-10
+
+### Added
+- PPTX 파일 첨부 가명화 지원 (JSZip + 정규식 XML 파싱, 슬라이드 + 노트 포함)
+- PPTX preserve-mode: 원본 ZIP 구조 유지 + 가명화 텍스트로 재생성 (`<a:t>` 교체)
+- HWP/HWPX 형식 감지 (OLE2 magic bytes / ZIP+mimetype) — format-detector 기존 구현
+- HWP/HWPX 미지원 명시 폴백 (LibreOffice 변환 안내, 외부 API 호출 0)
+- `HwpUnsupportedError`: name + converterUrl 속성으로 UI에서 링크 생성 가능
+- Format Detector: PPTX/HWP/HWPX/이미지 MIME + magic bytes 판별 (v0.4에서 이미 구현)
+- HWP 스파이크 보고서: `docs/hwp-spike-report.md` (hwp.js Node.js 의존 → 브라우저 불가)
+
+### Security
+- 외부 서버 변환 API 호출 0 — HWP 미지원 시 사용자에게 수동 변환 안내만 제공
+- innerHTML 사용 0건 유지
+- PPTX 텍스트 추출: DOMParser 대신 정규식 matchAll로 `<a:t>` 추출 (네임스페이스 독립)
+
+### Known Limitations
+- HWP preserve-mode 미지원 (원본 포맷 유지 재생성 불가, .txt도 현재 불가 — HwpUnsupportedError)
+- 이미지 OCR은 v0.6
+- hwp.js v0.0.3: Node.js fs 모듈 의존으로 브라우저/Service Worker 환경 불가
+
 ## [0.4.0] - 2026-05-10
 
 ### Added
