@@ -3,6 +3,8 @@
 export { FAKE_DOCX_TEXT, makeMockMammothResult } from './make-docx';
 export { makeMinimalXlsx, SAMPLE_XLSX_ROWS } from './make-xlsx';
 export { FAKE_PDF_TEXT_PAGES, makeMockPdfDocument } from './make-pdf';
+// v0.5 신규
+export { makeMinimalPptx, SLIDE1_TEXTS, SLIDE2_TEXTS, NOTE1_TEXT } from './make-pptx';
 
 /**
  * 픽스처 정책:

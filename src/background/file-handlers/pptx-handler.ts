@@ -89,8 +89,9 @@ async function extractPptxContent(arrayBuffer: ArrayBuffer): Promise<PptxContent
   const slideNames = Object.keys(zip.files)
     .filter(name => SLIDE_RE.test(name))
     .sort((a, b) => {
-      const numA = parseInt(SLIDE_RE.exec(a)?.[1] ?? '0', 10);
-      const numB = parseInt(SLIDE_RE.exec(b)?.[1] ?? '0', 10);
+      // matchAll로 번호 추출 (SLIDE_RE은 global flag 없이 사용하면 안 됨)
+      const numA = parseInt(a.match(SLIDE_RE)?.[1] ?? '0', 10);
+      const numB = parseInt(b.match(SLIDE_RE)?.[1] ?? '0', 10);
       return numA - numB;
     });
 
@@ -116,17 +117,20 @@ async function extractPptxContent(arrayBuffer: ArrayBuffer): Promise<PptxContent
 
 /**
  * XML 문자열에서 <a:t> 태그의 텍스트 콘텐츠를 이어붙인다.
- * DOMParser는 브라우저 + happy-dom 양쪽에서 동작한다.
+ *
+ * 전략: 정규식으로 <a:t>...</a:t> 패턴을 직접 추출한다.
+ * DOMParser의 네임스페이스 처리가 happy-dom / 브라우저마다 다를 수 있으므로
+ * 정규식 기반 접근이 더 안정적이다.
  */
 function extractTextFromXml(xml: string): string {
-  try {
-    const doc = new DOMParser().parseFromString(xml, 'application/xml');
-    // <a:t> 는 localName = 't' (네임스페이스 무관)
-    const nodes = Array.from(doc.querySelectorAll('t'));
-    return nodes.map(n => n.textContent ?? '').join(' ').trim();
-  } catch {
-    return '';
+  const parts: string[] = [];
+  // <a:t> 또는 <a:t xml:space="..."> 내 텍스트 수집
+  const tagRe = /<a:t(?:[^>]*)>([\s\S]*?)<\/a:t>/g;
+  for (const match of xml.matchAll(tagRe)) {
+    const content = match[1];
+    if (content) parts.push(content);
   }
+  return parts.join(' ').trim();
 }
 
 /**
