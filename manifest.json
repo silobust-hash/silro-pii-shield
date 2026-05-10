@@ -35,6 +35,20 @@
       "run_at": "document_idle"
     }
   ],
+  "commands": {
+    "preview-masking": {
+      "suggested_key": { "default": "Ctrl+Shift+M", "mac": "Command+Shift+M" },
+      "description": "마스킹 미리보기 (전송 전 확인)"
+    },
+    "toggle-side-panel": {
+      "suggested_key": { "default": "Ctrl+Shift+L", "mac": "Command+Shift+L" },
+      "description": "사이드패널 열기/닫기"
+    },
+    "switch-profile": {
+      "suggested_key": { "default": "Ctrl+Shift+P", "mac": "Command+Shift+P" },
+      "description": "의뢰인 프로필 전환"
+    }
+  },
   "permissions": ["storage", "sidePanel", "activeTab"],
   "host_permissions": [
     "https://claude.ai/*",
