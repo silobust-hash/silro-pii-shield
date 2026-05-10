@@ -18,12 +18,12 @@ export class DictionaryDetector {
         const flags = entry.caseInsensitive ? 'gi' : 'g';
         // Escape special regex chars in pattern string
         const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // matchAll requires global flag — already set via flags variable above
         const re = new RegExp(escaped, flags);
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(text)) !== null) {
+        for (const m of text.matchAll(re)) {
           raw.push({
-            start: m.index,
-            end: m.index + m[0].length,
+            start: m.index!,
+            end: m.index! + m[0].length,
             original: m[0],
             entry,
           });
