@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PdfHandler } from '@/background/file-handlers/pdf-handler';
+import { PdfHandler, ScannedPdfError, MAX_SCAN_PAGES } from '@/background/file-handlers/pdf-handler';
 import { FAKE_PDF_TEXT_PAGES, makeMockPdfDocument } from '../../fixtures/files/make-pdf';
 import type { Mapping } from '@/shared/types';
 
@@ -45,5 +45,39 @@ describe('PdfHandler', () => {
     const mappings: Mapping[] = [{ original: '홍길동', alias: 'A씨', category: 'person' }];
     const result = await handler.reconstruct(fakeBuffer, mappings, 'preserve'); // preserve 요청해도
     expect(result.mimeType).toBe('text/plain;charset=utf-8');  // 항상 txt
+  });
+});
+
+describe('ScannedPdfError', () => {
+  it('pageCount 속성이 설정된다', () => {
+    const err = new ScannedPdfError(5);
+    expect(err.pageCount).toBe(5);
+    expect(err.name).toBe('ScannedPdfError');
+  });
+
+  it(`페이지 수 <= ${MAX_SCAN_PAGES}이면 requiresUserConfirm = false`, () => {
+    const err = new ScannedPdfError(MAX_SCAN_PAGES);
+    expect(err.requiresUserConfirm).toBe(false);
+  });
+
+  it(`페이지 수 > ${MAX_SCAN_PAGES}이면 requiresUserConfirm = true`, () => {
+    const err = new ScannedPdfError(MAX_SCAN_PAGES + 1);
+    expect(err.requiresUserConfirm).toBe(true);
+  });
+
+  it('스캔 PDF 감지 시 extractText가 ScannedPdfError를 던진다', async () => {
+    // 빈 텍스트 반환 mock → 스캔 PDF로 판별
+    const emptyPdfMock = {
+      numPages: 2,
+      getPage: vi.fn().mockImplementation(async () => ({
+        getTextContent: vi.fn().mockResolvedValue({ items: [] }),
+      })),
+    };
+    vi.mocked(pdfjsLib.getDocument).mockReturnValue({
+      promise: Promise.resolve(emptyPdfMock),
+    } as any);
+
+    const h = new PdfHandler();
+    await expect(h.extractText(new ArrayBuffer(8))).rejects.toBeInstanceOf(ScannedPdfError);
   });
 });
