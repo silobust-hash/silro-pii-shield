@@ -13,8 +13,9 @@ const PBKDF2_HASH = 'SHA-256';
 const KEY_ALGO = 'AES-GCM';
 const KEY_LENGTH = 256;
 
-function toBase64(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)));
+function toBase64(buf: ArrayBuffer | Uint8Array): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  return btoa(String.fromCharCode(...bytes));
 }
 
 function fromBase64(b64: string): Uint8Array {
@@ -62,8 +63,8 @@ export async function encrypt(
   );
   return {
     ciphertext: toBase64(cipherBuf),
-    iv: toBase64(iv.buffer),
-    salt: toBase64(salt.buffer),
+    iv: toBase64(iv),
+    salt: toBase64(salt),
   };
 }
 
