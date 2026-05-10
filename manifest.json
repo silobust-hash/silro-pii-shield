@@ -7,7 +7,8 @@
     "16": "public/icons/icon-16.png",
     "32": "public/icons/icon-32.png",
     "48": "public/icons/icon-48.png",
-    "128": "public/icons/icon-128.png"
+    "128": "public/icons/icon-128.png",
+    "256": "public/icons/icon-256.png"
   },
   "background": {
     "service_worker": "src/background/service-worker.ts",
@@ -66,7 +67,8 @@
       "16": "public/icons/icon-16.png",
       "32": "public/icons/icon-32.png",
       "48": "public/icons/icon-48.png",
-      "128": "public/icons/icon-128.png"
+      "128": "public/icons/icon-128.png",
+      "256": "public/icons/icon-256.png"
     }
   }
 }
