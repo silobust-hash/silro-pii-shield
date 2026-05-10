@@ -1,7 +1,10 @@
 import { detectFormat, extractMagicBytes } from './format-detector';
+// detectFormat is now async (inspects ZIP internals for PPTX/HWPX/DOCX/XLSX distinction)
 import { DocxHandler } from './docx-handler';
 import { XlsxHandler } from './xlsx-handler';
 import { PdfHandler } from './pdf-handler';
+import { PptxHandler } from './pptx-handler';
+import { HwpHandler, HwpUnsupportedError } from './hwp-handler';
 import type { FileHandler, ReconstructedFile } from './base';
 import { ParseError } from './base';
 import type { Mapping, ReconstructionMode, FileInterceptEvent, FileProcessResult } from '@/shared/types';
@@ -10,6 +13,8 @@ const HANDLERS: FileHandler[] = [
   new DocxHandler(),
   new XlsxHandler(),
   new PdfHandler(),
+  new PptxHandler(),
+  new HwpHandler(),
 ];
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
@@ -41,9 +46,10 @@ export async function dispatchFileProcessing(
     };
   }
 
-  // 포맷 감지
+  // 포맷 감지 (async: ZIP 내부 content 검사 포함)
   const magicBytes = extractMagicBytes(arrayBuffer);
-  const format = detectFormat(mimeType, magicBytes);
+  void magicBytes; // kept for legacy handler.canHandle calls
+  const format = await detectFormat(mimeType, arrayBuffer);
 
   if (!format) {
     return {
@@ -64,6 +70,14 @@ export async function dispatchFileProcessing(
   try {
     rawText = await handler.extractText(arrayBuffer);
   } catch (err) {
+    // HWP 미지원 에러는 'unsupported' 상태로 반환 (parse_error 아님)
+    if (err instanceof HwpUnsupportedError) {
+      return {
+        requestId,
+        status: 'unsupported',
+        errorMessage: err.message,
+      };
+    }
     return {
       requestId,
       status: 'parse_error',
