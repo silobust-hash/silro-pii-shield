@@ -3,7 +3,8 @@ export type PiiCategory =
   | 'phone'
   | 'email'
   | 'business_no'
-  | 'case_no';
+  | 'case_no'
+  | 'korean_name';   // Layer 3
 
 export type PiiMatch = {
   category: PiiCategory;
