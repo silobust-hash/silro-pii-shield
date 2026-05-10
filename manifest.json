@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "silro-pii-shield",
-  "version": "0.1.0",
-  "description": "AI 입력 PII 자동 가명화",
+  "version": "0.2.0",
+  "description": "AI 입력 PII 자동 가명화 — 노무사·변호사를 위한 Chrome 확장",
   "icons": {
     "16": "public/icons/icon-16.png",
     "32": "public/icons/icon-32.png",
@@ -18,8 +18,41 @@
       "matches": ["https://claude.ai/*"],
       "js": ["src/content/content-main.ts"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["src/content/content-main.ts"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["src/content/content-main.ts"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.perplexity.ai/*"],
+      "js": ["src/content/content-main.ts"],
+      "run_at": "document_idle"
     }
   ],
-  "permissions": ["storage"],
-  "host_permissions": ["https://claude.ai/*"]
+  "permissions": ["storage", "sidePanel", "activeTab"],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://gemini.google.com/*",
+    "https://www.perplexity.ai/*"
+  ],
+  "side_panel": {
+    "default_path": "public/side-panel.html"
+  },
+  "options_page": "public/options.html",
+  "action": {
+    "default_title": "silro-pii-shield",
+    "default_icon": {
+      "16": "public/icons/icon-16.png",
+      "32": "public/icons/icon-32.png",
+      "48": "public/icons/icon-48.png",
+      "128": "public/icons/icon-128.png"
+    }
+  }
 }
