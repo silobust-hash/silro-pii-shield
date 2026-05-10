@@ -6,9 +6,10 @@ import { showPreflight } from './preflight-modal';
 // Task 16에서 구현 — 파일 Preflight 모달
 import { showFilePreflightModal } from './file-preflight-modal';
 import { showKoreanNameConfirm } from './confirm-dialog';
+import { showMappingPanel, nodeContainsAlias } from './mapping-panel';
 import { sendMessage } from '@/shared/messaging';
 import { installInterceptors } from './upload-interceptor';
-import type { MaskResult, SiteKey, FileInterceptEvent, FileProcessResult } from '@/shared/types';
+import type { MaskResult, Mapping, SiteKey, FileInterceptEvent, FileProcessResult } from '@/shared/types';
 import type { SiteAdapter } from './adapters/base';
 
 // dict alias 패턴도 포함: [주민번호-1], A씨, 회사1, 병원1, 부서1
@@ -170,10 +171,16 @@ const INPUT_SELECTORS: Record<string, string> = {
     },
   });
 
-  // Round-trip 모드에서만 응답 자동 복원
+  // Round-trip 모드: 응답 자동 복원 시도 + 매핑 패널 폴백
   if (mode === 'round-trip') {
     adapter.observeResponses((node) => {
-      void replaceTextInNode(node, adapter.getConversationId());
+      const conversationId = adapter.getConversationId();
+      void replaceTextInNode(node, conversationId);
+      // React 재렌더링으로 자동 복원이 덮어써지는 경우 대비:
+      // 응답에 가명이 발견되면 화면에 매핑 패널 자동 표시
+      if (nodeContainsAlias(node, ALIAS_DETECTION_REGEX)) {
+        void showMappingPanelForConversation(conversationId);
+      }
     });
   }
   // Hybrid 모드: 사이드패널에서 수동 복원 (observeResponses 등록 안 함)
@@ -255,6 +262,20 @@ function waitForElement(selector: string, timeout: number): Promise<HTMLElement>
     };
     check();
   });
+}
+
+async function showMappingPanelForConversation(conversationId: string): Promise<void> {
+  try {
+    const mappings = await sendMessage<Mapping[]>({
+      type: 'GET_MAPPINGS',
+      conversationId,
+    });
+    if (mappings && mappings.length > 0) {
+      showMappingPanel(mappings);
+    }
+  } catch (err) {
+    console.warn('[pii-shield] failed to load mappings for panel', err);
+  }
 }
 
 async function replaceTextInNode(node: Node, conversationId: string): Promise<void> {
