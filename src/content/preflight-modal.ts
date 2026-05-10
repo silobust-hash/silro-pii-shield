@@ -1,5 +1,8 @@
 import type { Mapping } from '@/shared/types';
 
+// v0.4: 파일 프리뷰 모달은 file-preflight-modal.ts에서 구현
+export { showFilePreflightModal } from './file-preflight-modal';
+
 export type PreflightDecision = 'send' | 'cancel';
 
 const OVERLAY_STYLE =
