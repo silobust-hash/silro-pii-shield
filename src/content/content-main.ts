@@ -3,9 +3,12 @@ import { ChatGPTAdapter } from './adapters/chatgpt';
 import { GeminiAdapter } from './adapters/gemini';
 import { PerplexityAdapter } from './adapters/perplexity';
 import { showPreflight } from './preflight-modal';
+// Task 16에서 구현 — 파일 Preflight 모달
+import { showFilePreflightModal } from './file-preflight-modal';
 import { showKoreanNameConfirm } from './confirm-dialog';
 import { sendMessage } from '@/shared/messaging';
-import type { MaskResult, SiteKey } from '@/shared/types';
+import { installInterceptors } from './upload-interceptor';
+import type { MaskResult, SiteKey, FileInterceptEvent, FileProcessResult } from '@/shared/types';
 import type { SiteAdapter } from './adapters/base';
 
 // dict alias 패턴도 포함: [주민번호-1], A씨, 회사1, 병원1, 부서1
@@ -116,6 +119,57 @@ const INPUT_SELECTORS: Record<string, string> = {
     return finalMasked;
   });
 
+  // v0.4: 파일 업로드 인터셉터 초기화
+  installInterceptors({
+    isUploadEndpoint: (url) => adapter.isUploadEndpoint(url),
+    onFileIntercepted: async (_url, file) => {
+      // 1. ArrayBuffer 읽기
+      const arrayBuffer = await file.arrayBuffer();
+      const conversationId = adapter.getConversationId();
+
+      // 2. SW로 파일 처리 요청
+      const result: FileProcessResult = await chrome.runtime.sendMessage({
+        type: 'FILE_INTERCEPT',
+        payload: {
+          requestId: crypto.randomUUID(),
+          fileName: file.name,
+          mimeType: file.type,
+          sizeBytes: file.size,
+          arrayBuffer,
+          site: adapter.siteId,
+          conversationId,
+        } satisfies FileInterceptEvent,
+      });
+
+      if (result.status === 'size_exceeded' || result.status === 'unsupported') {
+        // 미지원 포맷: 사용자에게 안내 후 업로드 차단
+        showFileWarningToast(result.errorMessage ?? '파일 업로드 차단됨');
+        throw new Error(result.errorMessage);
+      }
+
+      if (result.status === 'parse_error') {
+        showFileWarningToast(result.errorMessage ?? 'PII 파싱 실패');
+        throw new Error(result.errorMessage);
+      }
+
+      if (!result.piiSummary?.length) {
+        return null; // PII 없음 → 원본 그대로
+      }
+
+      // 3. Preflight 모달 표시 (사용자 확인)
+      const approved = await showFilePreflightModal(result);
+      if (!approved) throw new Error('사용자가 파일 업로드를 취소했습니다.');
+
+      // 4. 가명화된 파일 반환
+      if (!result.reconstructedBuffer) return null;
+      return new File(
+        [result.reconstructedBuffer],
+        result.reconstructedFileName ?? file.name,
+        { type: result.reconstructedMimeType ?? file.type }
+      );
+    },
+  });
+
   // Round-trip 모드에서만 응답 자동 복원
   if (mode === 'round-trip') {
     adapter.observeResponses((node) => {
@@ -124,6 +178,19 @@ const INPUT_SELECTORS: Record<string, string> = {
   }
   // Hybrid 모드: 사이드패널에서 수동 복원 (observeResponses 등록 안 함)
 })();
+
+/** 파일 처리 경고 토스트 표시 */
+function showFileWarningToast(message: string): void {
+  const toast = document.createElement('div');
+  toast.style.cssText =
+    'position:fixed;bottom:24px;right:24px;z-index:2147483647;' +
+    'background:#dc2626;color:white;padding:12px 16px;border-radius:8px;' +
+    'font-family:-apple-system,sans-serif;font-size:14px;max-width:320px;' +
+    'box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+  toast.textContent = `[PII Shield] ${message}`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 5000);
+}
 
 function waitForElement(selector: string, timeout: number): Promise<HTMLElement> {
   const start = Date.now();
