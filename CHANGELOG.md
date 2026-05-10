@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.3.0] - 2026-05-10
+
+### Added
+- **Layer 3: 한글 이름 휴리스틱** — 성씨 풀 200개 + 컨텍스트 boost + 화이트리스트
+  - confidence ≥ 0.7 시 Confirm 다이얼로그 (DOM API only, XSS-safe)
+  - 화이트리스트: 역사적 인물·음식명·지명 파생어 자동 제외
+  - Layer 1/2 매치 영역과 겹치면 Layer 3 자동 skip
+- **의뢰인 프로필 영구 저장** — chrome.storage.local CRUD
+  - `ClientProfile { id, name, mappings, notes, createdAt, updatedAt }`
+  - 사이드패널 "현재 매핑을 프로필로 저장" 버튼
+  - 프로필 셀렉터 드롭다운 (최신순 정렬)
+- **Hybrid 모드 토글** — 사이트별 Round-trip ↔ Hybrid (응답 자동 복원 ON/OFF)
+  - chrome.storage.sync에 사이트별 설정 저장
+  - Hybrid 모드: content script가 observeResponses 등록 안 함 (사이드패널 수동 복원)
+- `MASK_NAMES` 메시지 타입 (Layer 3 confirm 후 추가 마스킹)
+- `korean_name` PiiCategory (별칭: A씨, B씨, ... Z씨, AA씨...)
+
+### Changed
+- `MaskResult.pendingNames` 필드 추가 (Layer 3 pending matches)
+- `PIIDetector.detect()` 반환 타입이 `{ confirmed, pending }` 구조로 변경
+- `MappingManager`: `korean_name` 별칭 생성 로직 추가, `maskNames()` 메서드 추가
+- 사이드패널 UI: 모드 토글 + 프로필 셀렉터 섹션 추가
+
+### Security
+- Confirm 다이얼로그: innerHTML/outerHTML 사용 0건 (textContent only)
+- 프로필 저장: chrome.storage.local (외부 전송 0, PII 로컬 보관)
+- Layer 3 화이트리스트로 공인 인물명 오탐 방지
+
+### Known Limitations
+- 프로필 암호화(AES-GCM) 미구현 — v1.0 예정
+- 사이드패널 Hybrid 모드 수동 복원 UI 미구현 — v0.3.1 예정
+- 파일 첨부 가로채기 없음 — v0.4 예정
+
 ## [0.2.0] — 2026-05-10
 
 ### Added
