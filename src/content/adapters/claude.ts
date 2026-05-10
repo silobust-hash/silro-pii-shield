@@ -1,14 +1,57 @@
 import type { SiteAdapter, SubmitHandler, ResponseCallback } from './base';
 
-const INPUT_SELECTOR = 'div[contenteditable="true"][role="textbox"]';
-const SUBMIT_BUTTON_SELECTOR = 'button[aria-label*="Send"]';
-const RESPONSE_CONTAINER_SELECTOR = 'div[data-testid="conversation"]';
+const INPUT_SELECTOR = 'div[contenteditable="true"]';
+
+const SUBMIT_BUTTON_SELECTORS = [
+  'button[aria-label*="Send"]',
+  'button[aria-label*="send"]',
+  'button[aria-label*="보내기"]',
+  'button[aria-label*="message"]',
+  'button[aria-label*="Message"]',
+  'fieldset button[type="submit"]',
+  'button[type="submit"]',
+  'div.flex button:has(svg)',
+];
+
+const RESPONSE_CONTAINER_SELECTORS = [
+  'div[data-testid="conversation"]',
+  'main',
+  'div[role="main"]',
+];
+
+function findFirst(selectors: readonly string[]): HTMLElement | null {
+  for (const selector of selectors) {
+    try {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (el) return el;
+    } catch {
+      // invalid selector in some browsers (e.g. :has support)
+    }
+  }
+  return null;
+}
+
+function matchesAny(el: HTMLElement | null, selectors: readonly string[]): boolean {
+  if (!el) return false;
+  for (const selector of selectors) {
+    try {
+      if (el.closest?.(selector)) return true;
+    } catch {
+      // ignore unsupported selector
+    }
+  }
+  return false;
+}
 
 export class ClaudeAdapter implements SiteAdapter {
   hostname = 'claude.ai';
 
   findInputElement(): HTMLElement | null {
     return document.querySelector<HTMLElement>(INPUT_SELECTOR);
+  }
+
+  private findSubmitButton(): HTMLButtonElement | null {
+    return findFirst(SUBMIT_BUTTON_SELECTORS) as HTMLButtonElement | null;
   }
 
   hookSubmit(handler: SubmitHandler): void {
@@ -29,8 +72,7 @@ export class ClaudeAdapter implements SiteAdapter {
     document.addEventListener(
       'click',
       (e) => {
-        const target = (e.target as HTMLElement)?.closest?.(SUBMIT_BUTTON_SELECTOR);
-        if (target) {
+        if (matchesAny(e.target as HTMLElement, SUBMIT_BUTTON_SELECTORS)) {
           void this.interceptAndReplace(e, handler);
         }
       },
@@ -73,12 +115,11 @@ export class ClaudeAdapter implements SiteAdapter {
   }
 
   private dispatchSubmit(): void {
-    const button = document.querySelector<HTMLButtonElement>(SUBMIT_BUTTON_SELECTOR);
-    button?.click();
+    this.findSubmitButton()?.click();
   }
 
   observeResponses(callback: ResponseCallback): MutationObserver {
-    const container = document.querySelector(RESPONSE_CONTAINER_SELECTOR) ?? document.body;
+    const container = findFirst(RESPONSE_CONTAINER_SELECTORS) ?? document.body;
     const observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
         m.addedNodes.forEach((n) => callback(n));
@@ -92,7 +133,7 @@ export class ClaudeAdapter implements SiteAdapter {
     if (!this.findInputElement()) {
       return { ok: false, reason: 'input element not found' };
     }
-    if (!document.querySelector(SUBMIT_BUTTON_SELECTOR)) {
+    if (!this.findSubmitButton()) {
       return { ok: false, reason: 'submit button not found' };
     }
     return { ok: true };
