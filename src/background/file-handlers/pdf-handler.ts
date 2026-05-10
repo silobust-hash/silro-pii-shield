@@ -6,8 +6,11 @@ import type { Mapping, ReconstructionMode } from '@/shared/types';
 // pdf.js worker 경로 설정
 // chrome.runtime.getURL은 실제 확장에서만 사용 가능 — 테스트 환경에서는 빈 문자열 허용
 try {
-  // @ts-expect-error — chrome may not be available in test environment
-  pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.min.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = (
+    typeof chrome !== 'undefined' && chrome.runtime?.getURL
+      ? chrome.runtime.getURL('pdf.worker.min.mjs')
+      : ''
+  );
 } catch {
   // 테스트 환경 또는 비 확장 컨텍스트에서는 mock이 처리
 }

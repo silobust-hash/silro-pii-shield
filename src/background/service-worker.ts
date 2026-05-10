@@ -7,6 +7,8 @@ import type {
   SiteKey,
   SiteSettings,
   ClientProfile,
+  FileInterceptEvent,
+  FileProcessResult,
 } from '@/shared/types';
 import { PIIDetector } from './pii-detector/detector';
 import { DictionaryDetector } from './pii-detector/dictionary-detector';
@@ -15,6 +17,7 @@ import { storage, siteSettingsStore } from './storage';
 import { dictStore } from './dict-store';
 import { profileStore } from './profile-store';
 import { hybridModeStore } from './hybrid-mode';
+import { dispatchFileProcessing } from './file-handlers/dispatcher';
 
 let dictEntries: UserDictEntry[] = [];
 const dictDetector = new DictionaryDetector(dictEntries);
@@ -42,6 +45,40 @@ async function getManager(conversationId: string): Promise<MappingManager> {
 
 async function persistManager(manager: MappingManager): Promise<void> {
   await storage.saveConversation(manager.toJSON());
+}
+
+// v0.4: FILE_INTERCEPT 메시지 핸들러 (별도 리스너 — MessageType과 분리)
+chrome.runtime.onMessage.addListener(
+  (message: { type: string; payload?: FileInterceptEvent }, _sender, sendResponse) => {
+    if (message.type === 'FILE_INTERCEPT' && message.payload) {
+      const event = message.payload as FileInterceptEvent;
+      handleFileIntercept(event)
+        .then(sendResponse)
+        .catch((err) => sendResponse({
+          requestId: event.requestId,
+          status: 'parse_error',
+          errorMessage: String(err),
+        } satisfies FileProcessResult));
+      return true; // 비동기 응답
+    }
+    return false;
+  }
+);
+
+async function handleFileIntercept(event: FileInterceptEvent): Promise<FileProcessResult> {
+  // reconstructionMode는 chrome.storage.sync에서 읽음 (기본값: 'txt')
+  const { reconstructionMode = 'txt' } = await chrome.storage.sync.get('reconstructionMode');
+
+  return dispatchFileProcessing(
+    event,
+    async (text, conversationId) => {
+      const manager = await getManager(conversationId);
+      const result: MaskResult = manager.mask(text);
+      await persistManager(manager);
+      return { masked: result.masked, mappings: result.mappings };
+    },
+    reconstructionMode as 'txt' | 'preserve'
+  );
 }
 
 chrome.runtime.onMessage.addListener(

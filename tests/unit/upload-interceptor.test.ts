@@ -11,7 +11,7 @@ describe('fetch interceptor', () => {
     interceptedRequests = [];
     // mock을 먼저 설치 → installFetchInterceptor가 mock을 originalFetch로 캡처
     mockFetch = vi.fn().mockResolvedValue(new Response('ok'));
-    globalThis.fetch = mockFetch;
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
 
     installFetchInterceptor({
       isUploadEndpoint: (url) => url.includes('/api/files'),
