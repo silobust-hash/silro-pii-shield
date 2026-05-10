@@ -59,11 +59,15 @@ function injectAnimationStyle(): void {
  * 기존 패널이 있으면 갱신.
  */
 export function showMappingPanel(mappings: Mapping[]): void {
-  if (mappings.length === 0) return;
+  console.log('[pii-shield][panel] showMappingPanel called with', mappings.length, 'mappings');
+  if (mappings.length === 0) {
+    console.warn('[pii-shield][panel] empty mappings, returning');
+    return;
+  }
 
   const now = Date.now();
   if (now - lastShownAt < COOLDOWN_MS && panelEl) {
-    // cooldown 중이지만 이미 떠있으면 내용만 갱신
+    console.log('[pii-shield][panel] cooldown — updating existing panel');
     updatePanelContents(mappings);
     return;
   }
@@ -82,6 +86,7 @@ export function showMappingPanel(mappings: Mapping[]): void {
 
   buildPanelContents(panelEl, mappings);
   document.body.appendChild(panelEl);
+  console.log('[pii-shield][panel] panel appended to body');
 }
 
 function buildPanelContents(panel: HTMLDivElement, mappings: Mapping[]): void {
