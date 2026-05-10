@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.6.0] - 2026-05-10
+
+### Added
+- 이미지 OCR 지원 (JPG/PNG/WEBP): Tesseract.js v5.1.1 + 한국어 학습 데이터(kor.traineddata)
+- 스캔 PDF OCR 지원: pdf.js 텍스트 추출량 < 50자이면 ScannedPdfError throw → OCR 처리 분기
+- OCR Web Worker (`src/workers/ocr-worker.ts`): Service Worker 블로킹 0, lazy-load
+- OCR 신뢰도 임계값 게이트: 신뢰도 < 0.6 → Preflight Modal 경고 + 사용자 confirm 필수
+- Format Detector: image/jpeg, image/png, image/webp MIME + magic bytes 판별
+- `FileProcessResult`: `requiresConfirm?`, `ocrConfidence?` 필드 추가
+- `OcrRequest` / `OcrResponse` 메시지 프로토콜 타입 (`src/shared/types.ts`)
+- `ScannedPdfError`: 스캔 PDF 감지 에러 (pageCount + requiresUserConfirm)
+
+### Security
+- 외부 OCR API 호출 0 — 모든 OCR 처리 브라우저 내 Tesseract.js로 수행
+- kor.traineddata: Method B (Tesseract.js CDN lazy-fetch, 첫 OCR 시 다운로드 + IndexedDB 캐시)
+- innerHTML 사용 0건 유지 — OCR 경고 배너도 DOM API만 사용
+- ArrayBuffer transfer (zero-copy): 이미지 데이터 복사 없이 Worker 전달
+
+### Performance
+- OCR Worker lazy-load: 텍스트 전용 파일 처리 시 Tesseract.js 초기화 비용 0
+- Tesseract.js 싱글톤 Worker: 여러 이미지 업로드 시 재초기화 없음
+
+### Known Limitations
+- OCR 정확도는 이미지 품질에 의존 (저해상도 스캔 시 신뢰도 낮음)
+- 스캔 PDF: Canvas API는 MV3 Service Worker에서 불가 — Offscreen Document 통합 예정 (v0.7)
+  현재: 스캔 PDF 감지 + requiresConfirm=true 안내, 텍스트 PDF 변환 권고
+- 스캔 PDF 20페이지 초과 시 requiresUserConfirm=true (브라우저 메모리 보호)
+- 이미지/스캔PDF는 원본 포맷 재생성 불가 (.txt 출력만)
+- kor.traineddata 첫 OCR 시 네트워크 필요 (~10MB, 이후 캐시)
+
 ## [0.5.0] - 2026-05-10
 
 ### Added
