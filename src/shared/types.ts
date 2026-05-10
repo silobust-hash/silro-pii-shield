@@ -123,8 +123,24 @@ export type MessageResponse =
 
 // ── v0.4: File Handler Types ──────────────────────────────────────────────────
 
-/** 지원 파일 포맷 */
-export type SupportedFormat = 'docx' | 'xlsx' | 'pdf';
+/** 지원 파일 포맷 (v0.4 + v0.5 + v0.6) */
+export type SupportedFormat =
+  | 'docx' | 'xlsx' | 'pdf'          // v0.4 기존
+  | 'pptx' | 'hwp' | 'hwpx'          // v0.5 신규
+  | 'jpeg' | 'png' | 'webp';          // v0.6 신규
+
+// ── v0.6: OCR Types ───────────────────────────────────────────────────────────
+
+export type OcrRequest = {
+  type: 'OCR_RUN';
+  id: string;          // 요청 추적용 UUID
+  imageData: ArrayBuffer;
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+};
+
+export type OcrResponse =
+  | { type: 'OCR_RESULT'; id: string; text: string; confidence: number }
+  | { type: 'OCR_ERROR'; id: string; error: string };
 
 /** 재생성 모드 */
 export type ReconstructionMode = 'txt' | 'preserve';
