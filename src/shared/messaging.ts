@@ -1,4 +1,4 @@
-import type { MessageType, MessageResponse } from './types';
+import type { MessageType, MessageResponse, FileInterceptEvent, FileProcessResult } from './types';
 
 export function sendMessage<T = unknown>(message: MessageType): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -14,4 +14,27 @@ export function sendMessage<T = unknown>(message: MessageType): Promise<T> {
       resolve(response.data as T);
     });
   });
+}
+
+// ── v0.4: File message types ──────────────────────────────────────────────────
+
+export interface FileInterceptMessage {
+  type: 'FILE_INTERCEPT';
+  payload: FileInterceptEvent;
+}
+
+export interface FileProcessResultMessage {
+  type: 'FILE_PROCESS_RESULT';
+  payload: FileProcessResult;
+}
+
+export interface FileUploadProceedMessage {
+  type: 'FILE_UPLOAD_PROCEED';
+  requestId: string;
+}
+
+export interface FileUploadBlockMessage {
+  type: 'FILE_UPLOAD_BLOCK';
+  requestId: string;
+  reason: string;
 }

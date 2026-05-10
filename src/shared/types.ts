@@ -120,3 +120,40 @@ export type MessageType =
 export type MessageResponse =
   | { ok: true; data: MaskResult | string | void | ConversationMappings | UserDictEntry[] | AllSiteSettings | ClientProfile | ClientProfile[] | 'round-trip' | 'hybrid' }
   | { ok: false; error: string };
+
+// ── v0.4: File Handler Types ──────────────────────────────────────────────────
+
+/** 지원 파일 포맷 */
+export type SupportedFormat = 'docx' | 'xlsx' | 'pdf';
+
+/** 재생성 모드 */
+export type ReconstructionMode = 'txt' | 'preserve';
+
+/** 파일 인터셉트 이벤트 (content → SW) */
+export interface FileInterceptEvent {
+  requestId: string;          // 인터셉트한 fetch/XHR 요청 고유 ID
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  arrayBuffer: ArrayBuffer;   // 파일 원본 바이트
+  site: 'claude' | 'chatgpt' | 'gemini' | 'perplexity';
+  conversationId: string;
+}
+
+/** SW → content: 파일 처리 결과 */
+export interface FileProcessResult {
+  requestId: string;
+  status: 'ok' | 'blocked' | 'unsupported' | 'size_exceeded' | 'parse_error';
+  extractedText?: string;       // 미리보기용 (최초 500자)
+  piiSummary?: PiiMatch[];      // 감지된 PII 목록
+  reconstructedBuffer?: ArrayBuffer;  // 가명화된 파일 바이트
+  reconstructedFileName?: string;     // 예: original.docx → original_masked.docx
+  reconstructedMimeType?: string;
+  errorMessage?: string;
+}
+
+/** 파일별 재생성 설정 */
+export interface FileMaskingSettings {
+  reconstructionMode: ReconstructionMode;  // 기본값: 'txt'
+  maxFileSizeBytes: number;                // 기본값: 100 * 1024 * 1024 (100MB)
+}
