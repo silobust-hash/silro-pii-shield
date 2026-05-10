@@ -123,4 +123,17 @@ export class GeminiAdapter implements SiteAdapter {
     const match = location.pathname.match(/\/app\/([a-zA-Z0-9_-]+)/);
     return match ? `gemini:${match[1]}` : `gemini:home`;
   }
+
+  // v0.4: 파일 업로드 endpoint 매처
+  // Spike 메모: GCS signed URL 패턴은 Gemini UI 업데이트에 따라 변경될 수 있음
+  // v0.4 릴리즈 전 DevTools Network 탭으로 실제 패턴 검증 필요
+  isUploadEndpoint(url: string): boolean {
+    return (
+      url.includes('storage.googleapis.com') ||
+      url.includes('generativelanguage.googleapis.com/upload') ||
+      url.includes('/upload/v1/files')  // Gemini Files API
+    );
+  }
+
+  readonly siteId = 'gemini' as const;
 }

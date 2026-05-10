@@ -110,4 +110,11 @@ export class ChatGPTAdapter implements SiteAdapter {
     const match = location.pathname.match(/\/c\/([a-f0-9-]+)/);
     return match ? `chatgpt:${match[1]}` : `chatgpt:home`;
   }
+
+  // v0.4: 파일 업로드 endpoint 매처
+  isUploadEndpoint(url: string): boolean {
+    return url.includes('/backend-api/files');
+  }
+
+  readonly siteId = 'chatgpt' as const;
 }

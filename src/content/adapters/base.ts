@@ -8,4 +8,10 @@ export interface SiteAdapter {
   observeResponses(callback: ResponseCallback): MutationObserver;
   selfTest(): { ok: boolean; reason?: string };
   getConversationId(): string;
+
+  // v0.4 추가
+  /** 파일 업로드 endpoint URL 여부 판단 */
+  isUploadEndpoint(url: string): boolean;
+  /** 사이트 식별자 */
+  readonly siteId: 'claude' | 'chatgpt' | 'gemini' | 'perplexity';
 }

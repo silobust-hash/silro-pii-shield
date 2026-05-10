@@ -117,4 +117,11 @@ export class PerplexityAdapter implements SiteAdapter {
     const match = location.pathname.match(/\/(?:search|page)\/([^/]+)/);
     return match ? `perplexity:${match[1]}` : `perplexity:home`;
   }
+
+  // v0.4: 파일 업로드 endpoint 매처
+  isUploadEndpoint(url: string): boolean {
+    return url.includes('/api/upload') || url.includes('/file-proxy');
+  }
+
+  readonly siteId = 'perplexity' as const;
 }

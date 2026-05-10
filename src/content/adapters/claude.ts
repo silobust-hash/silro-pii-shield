@@ -102,4 +102,11 @@ export class ClaudeAdapter implements SiteAdapter {
     const match = location.pathname.match(/\/chat\/([a-f0-9-]+)/);
     return match ? `claude:${match[1]}` : `claude:home`;
   }
+
+  // v0.4: 파일 업로드 endpoint 매처
+  isUploadEndpoint(url: string): boolean {
+    return /\/api\/organizations\/[^/]+\/files/.test(url);
+  }
+
+  readonly siteId = 'claude' as const;
 }
