@@ -1,10 +1,30 @@
-import type { MessageType, MessageResponse, MaskResult } from '@/shared/types';
+import type {
+  MessageType,
+  MessageResponse,
+  MaskResult,
+  UserDictEntry,
+  AllSiteSettings,
+  SiteKey,
+  SiteSettings,
+} from '@/shared/types';
 import { PIIDetector } from './pii-detector/detector';
+import { DictionaryDetector } from './pii-detector/dictionary-detector';
 import { MappingManager } from './mapping-manager';
-import { storage } from './storage';
+import { storage, siteSettingsStore } from './storage';
+import { dictStore } from './dict-store';
 
-const detector = new PIIDetector();
+let dictEntries: UserDictEntry[] = [];
+const dictDetector = new DictionaryDetector(dictEntries);
+const detector = new PIIDetector(dictDetector);
 const managers = new Map<string, MappingManager>();
+
+async function loadDict(): Promise<void> {
+  dictEntries = await dictStore.getAll();
+  dictDetector.update(dictEntries);
+}
+
+// Service worker 기동 시 사전 로드
+void loadDict();
 
 async function getManager(conversationId: string): Promise<MappingManager> {
   let manager = managers.get(conversationId);
@@ -42,6 +62,41 @@ chrome.runtime.onMessage.addListener(
           case 'CLEAR_CONVERSATION': {
             managers.delete(message.conversationId);
             await storage.clearConversation(message.conversationId);
+            sendResponse({ ok: true, data: undefined });
+            break;
+          }
+          case 'GET_MAPPINGS': {
+            const saved = await storage.getConversation(message.conversationId);
+            sendResponse({ ok: true, data: saved ?? undefined });
+            break;
+          }
+          case 'GET_DICT': {
+            const entries: UserDictEntry[] = await dictStore.getAll();
+            sendResponse({ ok: true, data: entries });
+            break;
+          }
+          case 'UPSERT_DICT_ENTRY': {
+            await dictStore.upsert(message.entry);
+            await loadDict(); // detector 캐시 갱신
+            sendResponse({ ok: true, data: undefined });
+            break;
+          }
+          case 'DELETE_DICT_ENTRY': {
+            await dictStore.delete(message.id);
+            await loadDict();
+            sendResponse({ ok: true, data: undefined });
+            break;
+          }
+          case 'GET_SITE_SETTINGS': {
+            const settings: AllSiteSettings = await siteSettingsStore.getAll();
+            sendResponse({ ok: true, data: settings });
+            break;
+          }
+          case 'SET_SITE_SETTINGS': {
+            await siteSettingsStore.set(
+              message.siteKey as SiteKey,
+              message.settings as SiteSettings,
+            );
             sendResponse({ ok: true, data: undefined });
             break;
           }
