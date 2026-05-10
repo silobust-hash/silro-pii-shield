@@ -6,6 +6,7 @@ import { PdfHandler } from './pdf-handler';
 import { PptxHandler } from './pptx-handler';
 import { HwpHandler, HwpUnsupportedError } from './hwp-handler';
 import { ImageHandler, type ImageExtractionResult } from './image-handler';
+import { ScannedPdfError, MAX_SCAN_PAGES } from './pdf-handler';
 import type { FileHandler, ReconstructedFile } from './base';
 import { ParseError } from './base';
 import type { Mapping, ReconstructionMode, FileInterceptEvent, FileProcessResult } from '@/shared/types';
@@ -86,6 +87,20 @@ export async function dispatchFileProcessing(
         requestId,
         status: 'unsupported',
         errorMessage: err.message,
+      };
+    }
+    // 스캔 PDF: 'ok' 반환 + requiresConfirm 플래그 (Offscreen OCR 미구현 시 안내)
+    if (err instanceof ScannedPdfError) {
+      return {
+        requestId,
+        status: 'ok',
+        extractedText: `[스캔 PDF ${err.pageCount}페이지 — OCR 처리 필요]`,
+        piiSummary: [],
+        requiresConfirm: true,
+        ocrConfidence: 0,
+        errorMessage: err.requiresUserConfirm
+          ? `${err.pageCount}페이지 스캔 PDF — ${MAX_SCAN_PAGES}페이지 초과로 처리 전 확인이 필요합니다.`
+          : '스캔 PDF 감지 — 이미지 기반 문서는 OCR 처리가 필요합니다. 텍스트 PDF로 변환 후 업로드를 권장합니다.',
       };
     }
     return {
