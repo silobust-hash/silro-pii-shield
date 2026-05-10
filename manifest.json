@@ -50,6 +50,9 @@
       "description": "의뢰인 프로필 전환"
     }
   },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self'"
+  },
   "permissions": ["storage", "sidePanel", "activeTab"],
   "host_permissions": [
     "https://claude.ai/*",
