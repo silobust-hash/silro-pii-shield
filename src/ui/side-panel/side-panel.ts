@@ -5,6 +5,7 @@ import type {
   AllSiteSettings,
   SiteKey,
   DictCategory,
+  ClientProfile,
 } from '@/shared/types';
 
 const SITE_KEYS: SiteKey[] = [
@@ -197,6 +198,122 @@ function setupAddForm(): void {
   });
 }
 
+// ── Profile Selector ──────────────────────────────────────────────────────────
+
+function renderProfileSelector(
+  profiles: ClientProfile[],
+  currentMappings: ConversationMappings | null,
+): void {
+  const container = document.getElementById('profile-section');
+  if (!container) return;
+  while (container.firstChild) container.removeChild(container.firstChild);
+
+  // Label
+  const label = document.createElement('p');
+  label.className = 'section-label';
+  label.textContent = '의뢰인 프로필';
+  container.appendChild(label);
+
+  // Profile dropdown
+  const select = document.createElement('select');
+  select.className = 'profile-select';
+  select.style.cssText = 'width:100%;font-size:13px;padding:4px 8px;border:1px solid #ddd;border-radius:6px;margin-bottom:8px';
+
+  const defaultOpt = document.createElement('option');
+  defaultOpt.value = '';
+  defaultOpt.textContent = '-- 프로필 선택 --';
+  select.appendChild(defaultOpt);
+
+  for (const p of profiles) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    select.appendChild(opt);
+  }
+
+  select.addEventListener('change', () => {
+    const selected = profiles.find((p) => p.id === select.value);
+    if (selected) {
+      console.log('[pii-shield] profile selected:', selected.name);
+    }
+  });
+
+  container.appendChild(select);
+
+  // Save button
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = '현재 매핑을 프로필로 저장';
+  saveBtn.style.cssText = 'width:100%;font-size:12px;padding:6px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600';
+  saveBtn.addEventListener('click', async () => {
+    if (!currentMappings) {
+      alert('저장할 매핑이 없습니다.');
+      return;
+    }
+    const name = prompt('프로필 이름을 입력하세요 (예: 홍길동 부당해고 사건)');
+    if (!name) return;
+    await sendMessage({
+      type: 'SAVE_PROFILE',
+      profile: {
+        id: crypto.randomUUID(),
+        name,
+        mappings: currentMappings,
+        notes: '',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    });
+    // Refresh profile list
+    const updatedProfiles = await sendMessage<ClientProfile[]>({ type: 'LIST_PROFILES' });
+    renderProfileSelector(updatedProfiles ?? [], currentMappings);
+  });
+  container.appendChild(saveBtn);
+}
+
+// ── Hybrid Mode Toggle ────────────────────────────────────────────────────────
+
+function renderModeToggle(hostname: string, currentMode: 'round-trip' | 'hybrid'): void {
+  const container = document.getElementById('mode-toggle-section');
+  if (!container) return;
+  while (container.firstChild) container.removeChild(container.firstChild);
+
+  const label = document.createElement('p');
+  label.className = 'section-label';
+  label.textContent = '응답 복원 모드';
+  container.appendChild(label);
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:16px;align-items:center';
+
+  for (const m of ['round-trip', 'hybrid'] as const) {
+    const radioLabel = document.createElement('label');
+    radioLabel.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer';
+
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'hybrid-mode';
+    radio.value = m;
+    radio.checked = currentMode === m;
+
+    radio.addEventListener('change', async () => {
+      if (radio.checked) {
+        await sendMessage({
+          type: 'SET_HYBRID_MODE',
+          setting: { hostname, mode: m },
+        });
+      }
+    });
+
+    const text = document.createTextNode(m === 'round-trip' ? '자동 복원' : 'Hybrid (수동)');
+    radioLabel.appendChild(radio);
+    radioLabel.appendChild(text);
+    row.appendChild(radioLabel);
+  }
+
+  container.appendChild(row);
+}
+
+// ── Main init ─────────────────────────────────────────────────────────────────
+
 async function init(): Promise<void> {
   const { hostname, path } = await getActiveTabInfo();
   const conversationId = getConversationIdFromUrl(hostname, path);
@@ -204,12 +321,15 @@ async function init(): Promise<void> {
   const siteLabel = document.getElementById('site-label')!;
   siteLabel.textContent = hostname || '(지원 사이트 아님)';
 
+  let currentMappings: ConversationMappings | null = null;
+
   try {
     const mappings = await sendMessage<ConversationMappings | null>({
       type: 'GET_MAPPINGS',
       conversationId,
     });
-    renderMappings(mappings as ConversationMappings | null);
+    currentMappings = mappings as ConversationMappings | null;
+    renderMappings(currentMappings);
   } catch {
     renderMappings(null);
   }
@@ -224,6 +344,25 @@ async function init(): Promise<void> {
   }
 
   setupAddForm();
+
+  // v0.3: Profile selector
+  try {
+    const profiles = await sendMessage<ClientProfile[]>({ type: 'LIST_PROFILES' });
+    renderProfileSelector(profiles ?? [], currentMappings);
+  } catch {
+    renderProfileSelector([], currentMappings);
+  }
+
+  // v0.3: Hybrid mode toggle
+  try {
+    const mode = await sendMessage<'round-trip' | 'hybrid'>({
+      type: 'GET_HYBRID_MODE',
+      hostname,
+    });
+    renderModeToggle(hostname, mode ?? 'round-trip');
+  } catch {
+    renderModeToggle(hostname, 'round-trip');
+  }
 }
 
 void init();
