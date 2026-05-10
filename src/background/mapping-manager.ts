@@ -1,6 +1,7 @@
 import type {
   PiiCategory,
-  PiiMatch,
+  AnyCategory,
+  ExtendedPiiMatch,
   Mapping,
   MaskResult,
   ConversationMappings,
@@ -14,9 +15,6 @@ const ALIAS_PREFIX: Record<PiiCategory, string> = {
   business_no: '사업자번호',
   case_no: '사건',
 };
-
-const ALIAS_PATTERN =
-  /\[(?:주민번호|전화|이메일|사업자번호|사건)-\d+\]/g;
 
 export class MappingManager {
   private forward = new Map<string, string>();
@@ -52,7 +50,13 @@ export class MappingManager {
 
   unmask(text: string): string {
     if (this.reverse.size === 0) return text;
-    return text.replace(ALIAS_PATTERN, (alias) => this.reverse.get(alias) ?? alias);
+    // Build dynamic pattern from all registered reverse keys
+    const keys = [...this.reverse.keys()].map(
+      (k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+    );
+    if (keys.length === 0) return text;
+    const pattern = new RegExp(keys.join('|'), 'g');
+    return text.replace(pattern, (alias) => this.reverse.get(alias) ?? alias);
   }
 
   toJSON(): ConversationMappings {
@@ -76,12 +80,23 @@ export class MappingManager {
     return m;
   }
 
-  private assignAlias(match: PiiMatch): string {
+  private assignAlias(match: ExtendedPiiMatch): string {
     const existing = this.forward.get(match.original);
     if (existing) return existing;
-    const next = (this.counters[match.category] ?? 0) + 1;
-    this.counters[match.category] = next;
-    const alias = `[${ALIAS_PREFIX[match.category]}-${next}]`;
+
+    // dict aliasOverride → 고정 가명 사용 (카운터 소비 안 함)
+    if (match.aliasOverride) {
+      this.forward.set(match.original, match.aliasOverride);
+      this.reverse.set(match.aliasOverride, match.original);
+      return match.aliasOverride;
+    }
+
+    // Layer 1 regex → 카운터 기반 가명 생성
+    const cat = match.category as PiiCategory;
+    const prefix = ALIAS_PREFIX[cat] ?? 'PII';
+    const next = (this.counters[cat] ?? 0) + 1;
+    this.counters[cat] = next;
+    const alias = `[${prefix}-${next}]`;
     this.forward.set(match.original, alias);
     this.reverse.set(alias, match.original);
     return alias;

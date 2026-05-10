@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MappingManager } from '@/background/mapping-manager';
 import { PIIDetector } from '@/background/pii-detector/detector';
+import { DictionaryDetector } from '@/background/pii-detector/dictionary-detector';
+import { HONG_ENTRY } from '@tests/fixtures/dict-samples';
 
 describe('MappingManager.mask', () => {
   let manager: MappingManager;
@@ -80,5 +82,24 @@ describe('MappingManager 직렬화', () => {
     const m2 = MappingManager.fromJSON(json, new PIIDetector());
     expect(m2.unmask('[전화-1]')).toBe('010-1234-5678');
     expect(m2.mask('010-1234-5678').masked).toBe('[전화-1]');
+  });
+});
+
+describe('MappingManager — dict aliasOverride', () => {
+  it('aliasOverride가 있으면 카운터 가명 대신 aliasOverride 사용', () => {
+    const detector = new PIIDetector(new DictionaryDetector([HONG_ENTRY]));
+    const mgr = new MappingManager('test:conv', detector);
+    const { masked, mappings } = mgr.mask('홍길동이 자료를 제출');
+    expect(masked).toContain('A씨');
+    expect(mappings[0].alias).toBe('A씨');
+  });
+
+  it('같은 aliasOverride는 동일 대화 내에서 항상 같은 원본에 매핑', () => {
+    const detector = new PIIDetector(new DictionaryDetector([HONG_ENTRY]));
+    const mgr = new MappingManager('test:conv', detector);
+    mgr.mask('홍길동 첫 문장');
+    const { masked } = mgr.mask('홍 대표 두 번째 문장');
+    // 홍 대표는 HONG_ENTRY의 별칭 → 같은 alias "A씨"
+    expect(masked).toContain('A씨');
   });
 });
