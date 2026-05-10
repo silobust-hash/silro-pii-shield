@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "silro-pii-shield",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "AI 입력 PII 자동 가명화 — 노무사·변호사를 위한 Chrome 확장",
   "icons": {
     "16": "public/icons/icon-16.png",

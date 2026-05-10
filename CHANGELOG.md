@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.0.0] - 2026-05-10
+
+### Added
+- **AES-GCM 암호화 모듈** (`src/background/crypto.ts`): PBKDF2 SHA-256 310,000 iterations + AES-GCM 256-bit, Web Crypto API 네이티브
+- **암호화 스토리지 래퍼** (`src/background/encrypted-storage.ts`): chrome.storage.local 옵션 암호화, CryptoKey 메모리 전용 보관
+- **마스터 비밀번호 설정 UI** (`src/ui/options/master-password.ts`): 활성화/잠금/해제/비활성화 phase 상태 머신
+- **암호화 내보내기/가져오기** (`src/ui/options/export-import.ts`): JSON 백업 (평문 또는 AES-GCM 암호화), Blob+URL.createObjectURL
+- **키보드 단축키 3개**: Cmd/Ctrl+Shift+M (미리보기), L (사이드패널), P (프로필 전환)
+- **manifest.json commands API**: 3개 단축키 등록, chrome.commands.onCommand 핸들러
+- **프로덕션 아이콘 세트**: SVG 원본 + @resvg/resvg-js로 16/32/48/128/256 PNG 생성
+- **문서 4종**: PRIVACY.md, SECURITY.md, CONTRIBUTING.md, INSTALL.md
+- **Chrome Web Store 등록 문구**: listing-ko.md, listing-en.md, screenshots-needed.md
+- **최종 E2E 테스트**: `tests/e2e/v1-full.spec.ts` (manifest smoke 4종 + 브라우저/사이트 조건부 6종)
+
+### Changed
+- `vite.config.ts`: `build.sourcemap: true` — dist/assets/*.map 파일 생성
+- `manifest.json`: `content_security_policy` 명시 추가 (`script-src/object-src/connect-src 'self'`), version 1.0.0
+- `package.json`: version 1.0.0, build:zip / icons / audit 스크립트 추가
+- `options.html`: 암호화 + 내보내기/가져오기 마운트 포인트 추가
+
+### Fixed
+- `crypto.ts`: TypeScript `ArrayBufferLike` vs `ArrayBuffer` 타입 오류 수정 (toBase64 오버로드)
+- `encrypted-storage.ts`: 세션 잠금 후 `secureGet`이 암호화 blob 대신 `null` 반환하도록 수정
+
+### Security
+- 마스터 비밀번호 외부 전송 0 — salt만 저장, password·CryptoKey는 메모리 전용
+- CSP 명시: `script-src 'self'; object-src 'self'; connect-src 'self'`
+- innerHTML/outerHTML/insertAdjacentHTML 코드베이스 전체 0건 유지 (grep 검증)
+- happy-dom 14.12.0 → 20.9.0 업그레이드 (GHSA-96g7 critical 해소)
+- hwp.js 의존성 제거 (브라우저/Service Worker 미지원, Path B 선택 확정)
+- Source map 공개 (MIT 오픈소스 일관성)
+
 ## [0.6.0] - 2026-05-10
 
 ### Added
