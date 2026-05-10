@@ -6,12 +6,15 @@ import type {
   AllSiteSettings,
   SiteKey,
   SiteSettings,
+  ClientProfile,
 } from '@/shared/types';
 import { PIIDetector } from './pii-detector/detector';
 import { DictionaryDetector } from './pii-detector/dictionary-detector';
 import { MappingManager } from './mapping-manager';
 import { storage, siteSettingsStore } from './storage';
 import { dictStore } from './dict-store';
+import { profileStore } from './profile-store';
+import { hybridModeStore } from './hybrid-mode';
 
 let dictEntries: UserDictEntry[] = [];
 const dictDetector = new DictionaryDetector(dictEntries);
@@ -98,6 +101,46 @@ chrome.runtime.onMessage.addListener(
               message.settings as SiteSettings,
             );
             sendResponse({ ok: true, data: undefined });
+            break;
+          }
+          // v0.3: Profile CRUD
+          case 'LIST_PROFILES': {
+            const profiles: ClientProfile[] = await profileStore.list();
+            sendResponse({ ok: true, data: profiles });
+            break;
+          }
+          case 'GET_PROFILE': {
+            const profile = await profileStore.get(message.profileId);
+            sendResponse({ ok: true, data: profile ?? undefined });
+            break;
+          }
+          case 'SAVE_PROFILE': {
+            await profileStore.save(message.profile);
+            sendResponse({ ok: true, data: undefined });
+            break;
+          }
+          case 'DELETE_PROFILE': {
+            await profileStore.delete(message.profileId);
+            sendResponse({ ok: true, data: undefined });
+            break;
+          }
+          // v0.3: Hybrid mode
+          case 'GET_HYBRID_MODE': {
+            const mode = await hybridModeStore.getMode(message.hostname);
+            sendResponse({ ok: true, data: mode });
+            break;
+          }
+          case 'SET_HYBRID_MODE': {
+            await hybridModeStore.setMode(message.setting);
+            sendResponse({ ok: true, data: undefined });
+            break;
+          }
+          // v0.3: MASK_NAMES (Layer 3 confirm result)
+          case 'MASK_NAMES': {
+            const manager = await getManager(message.conversationId);
+            const result = manager.maskNames(message.text, message.names);
+            await persistManager(manager);
+            sendResponse({ ok: true, data: result });
             break;
           }
         }
