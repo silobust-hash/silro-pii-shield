@@ -46,6 +46,9 @@ function matchesAny(el: HTMLElement | null, selectors: readonly string[]): boole
 export class ClaudeAdapter implements SiteAdapter {
   hostname = 'claude.ai';
 
+  // 우리가 트리거한 click을 다시 가로채지 않도록 가드
+  private isInternalDispatch = false;
+
   findInputElement(): HTMLElement | null {
     return document.querySelector<HTMLElement>(INPUT_SELECTOR);
   }
@@ -58,6 +61,7 @@ export class ClaudeAdapter implements SiteAdapter {
     document.addEventListener(
       'keydown',
       (e) => {
+        if (this.isInternalDispatch) return;
         if (
           e.key === 'Enter' &&
           !e.shiftKey &&
@@ -72,6 +76,7 @@ export class ClaudeAdapter implements SiteAdapter {
     document.addEventListener(
       'click',
       (e) => {
+        if (this.isInternalDispatch) return;
         if (matchesAny(e.target as HTMLElement, SUBMIT_BUTTON_SELECTORS)) {
           void this.interceptAndReplace(e, handler);
         }
@@ -109,13 +114,58 @@ export class ClaudeAdapter implements SiteAdapter {
   }
 
   private replaceInputContent(input: HTMLElement, text: string): void {
-    // textContent 사용 (innerHTML 금지 — XSS 방지)
-    input.textContent = text;
-    input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    // ProseMirror/React 에디터는 textContent 직접 변경을 인식 못함.
+    // paste 이벤트로 시뮬레이션 (사용자가 붙여넣기한 것처럼)
+    input.focus();
+
+    // 기존 내용 모두 선택
+    const selection = window.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+      const range = document.createRange();
+      range.selectNodeContents(input);
+      selection.addRange(range);
+    }
+
+    // paste 이벤트 디스패치
+    const dataTransfer = new DataTransfer();
+    dataTransfer.setData('text/plain', text);
+    const pasteEvent = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    });
+    const accepted = input.dispatchEvent(pasteEvent);
+
+    // paste가 처리 안 됐으면 fallback (textContent 직접 + InputEvent)
+    if (!accepted || input.innerText.trim() !== text.trim()) {
+      input.textContent = text;
+      input.dispatchEvent(
+        new InputEvent('input', {
+          bubbles: true,
+          inputType: 'insertText',
+          data: text,
+        }),
+      );
+    }
   }
 
   private dispatchSubmit(): void {
-    this.findSubmitButton()?.click();
+    this.isInternalDispatch = true;
+    // ProseMirror가 paste 후 state를 업데이트할 시간을 줌
+    setTimeout(() => {
+      const button = this.findSubmitButton();
+      if (button && !button.disabled) {
+        button.click();
+      } else {
+        // 버튼이 여전히 disabled면 사용자에게 알림
+        console.warn('[pii-shield] submit button still disabled — please press Enter manually');
+      }
+      // 가드 해제 (혹시 모를 사이드이펙트 방지)
+      setTimeout(() => {
+        this.isInternalDispatch = false;
+      }, 200);
+    }, 250);
   }
 
   observeResponses(callback: ResponseCallback): MutationObserver {
