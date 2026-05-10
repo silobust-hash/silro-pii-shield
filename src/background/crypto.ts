@@ -30,15 +30,16 @@ export async function deriveKey(
   salt: Uint8Array,
 ): Promise<CryptoKey> {
   const enc = new TextEncoder();
+  const passwordBytes = enc.encode(password);
   const rawKey = await crypto.subtle.importKey(
     'raw',
-    enc.encode(password),
+    passwordBytes.buffer as ArrayBuffer,
     'PBKDF2',
     false,
     ['deriveKey'],
   );
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: PBKDF2_HASH },
+    { name: 'PBKDF2', salt: salt.buffer as ArrayBuffer, iterations: PBKDF2_ITERATIONS, hash: PBKDF2_HASH },
     rawKey,
     { name: KEY_ALGO, length: KEY_LENGTH },
     false,
@@ -53,15 +54,16 @@ export async function encrypt(
 ): Promise<EncryptedBlob> {
   const enc = new TextEncoder();
   const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = enc.encode(plaintext);
   const cipherBuf = await crypto.subtle.encrypt(
-    { name: KEY_ALGO, iv },
+    { name: KEY_ALGO, iv: iv.buffer as ArrayBuffer },
     key,
-    enc.encode(plaintext),
+    encoded.buffer as ArrayBuffer,
   );
   return {
     ciphertext: toBase64(cipherBuf),
-    iv: toBase64(iv),
-    salt: toBase64(salt),
+    iv: toBase64(iv.buffer),
+    salt: toBase64(salt.buffer),
   };
 }
 
@@ -70,11 +72,11 @@ export async function decrypt(
   blob: EncryptedBlob,
 ): Promise<string> {
   const iv = fromBase64(blob.iv);
-  const cipherBuf = fromBase64(blob.ciphertext).buffer;
+  const cipherBytes = fromBase64(blob.ciphertext);
   const plainBuf = await crypto.subtle.decrypt(
-    { name: KEY_ALGO, iv },
+    { name: KEY_ALGO, iv: iv.buffer as ArrayBuffer },
     key,
-    cipherBuf,
+    cipherBytes.buffer as ArrayBuffer,
   );
   return new TextDecoder().decode(plainBuf);
 }
