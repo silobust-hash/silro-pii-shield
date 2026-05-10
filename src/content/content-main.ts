@@ -118,33 +118,21 @@ const INPUT_SELECTORS: Record<string, string> = {
       throw new Error('User cancelled');
     }
 
-    // 매핑 패널을 응답 도착 전에 미리 표시 (observeResponses 의존성 제거)
+    // 매핑 패널 표시 — preflight result.mappings 우선, GET_MAPPINGS는 fallback
     void (async () => {
-      try {
-        console.log('[pii-shield] requesting GET_MAPPINGS for', conversationId);
-        const mappings = await sendMessage<Mapping[]>({
-          type: 'GET_MAPPINGS',
-          conversationId,
-        });
-        console.log('[pii-shield] got mappings:', mappings);
-        if (mappings && mappings.length > 0) {
-          console.log('[pii-shield] calling showMappingPanel with', mappings.length, 'entries');
-          showMappingPanel(mappings);
-        } else {
-          // result.mappings를 fallback으로 사용
-          if (result.mappings && result.mappings.length > 0) {
-            console.log('[pii-shield] using result.mappings fallback:', result.mappings.length, 'entries');
-            showMappingPanel(result.mappings);
-          } else {
-            console.warn('[pii-shield] no mappings to show');
+      if (result.mappings && result.mappings.length > 0) {
+        showMappingPanel(result.mappings);
+      } else {
+        try {
+          const mappings = await sendMessage<Mapping[]>({
+            type: 'GET_MAPPINGS',
+            conversationId,
+          });
+          if (mappings && Array.isArray(mappings) && mappings.length > 0) {
+            showMappingPanel(mappings);
           }
-        }
-      } catch (err) {
-        console.warn('[pii-shield] failed to show mapping panel', err);
-        // catch 블록에서도 result.mappings를 fallback으로 사용
-        if (result.mappings && result.mappings.length > 0) {
-          console.log('[pii-shield] using result.mappings after error fallback');
-          showMappingPanel(result.mappings);
+        } catch {
+          // 매핑 패널 실패는 silent — 메시지 전송은 정상 진행
         }
       }
     })();

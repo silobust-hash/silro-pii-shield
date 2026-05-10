@@ -9,16 +9,16 @@ let panelEl: HTMLDivElement | null = null;
 let lastShownAt = 0;
 const COOLDOWN_MS = 4000;
 
+// 우측 상단 — 화면 가리지 않으면서 매핑 표 확인 가능
 const PANEL_STYLE =
   'position:fixed!important;top:100px!important;right:20px!important;' +
   'z-index:2147483647!important;' +
-  'background:white!important;border:3px solid #1e40af!important;border-radius:12px!important;' +
-  'box-shadow:0 12px 32px rgba(0,0,0,0.25)!important;padding:14px 16px!important;' +
-  'width:360px!important;max-width:90vw!important;max-height:70vh!important;overflow-y:auto!important;' +
+  'background:white!important;border:2px solid #1e40af!important;border-radius:12px!important;' +
+  'box-shadow:0 8px 24px rgba(0,0,0,0.2)!important;padding:14px 16px!important;' +
+  'width:340px!important;max-width:calc(100vw - 40px)!important;max-height:60vh!important;overflow-y:auto!important;' +
   'font-family:-apple-system,BlinkMacSystemFont,sans-serif!important;font-size:13px!important;' +
   'color:#111827!important;' +
-  'animation:pii-shield-slide-in 0.25s ease-out!important;' +
-  'pointer-events:auto!important;display:block!important;';
+  'pointer-events:auto!important;display:block!important;visibility:visible!important;opacity:1!important;';
 
 const HEADER_STYLE =
   'display:flex;justify-content:space-between;align-items:center;' +
@@ -62,15 +62,10 @@ function injectAnimationStyle(): void {
  * 기존 패널이 있으면 갱신.
  */
 export function showMappingPanel(mappings: Mapping[]): void {
-  console.log('[pii-shield][panel] showMappingPanel called with', mappings.length, 'mappings');
-  if (mappings.length === 0) {
-    console.warn('[pii-shield][panel] empty mappings, returning');
-    return;
-  }
+  if (mappings.length === 0) return;
 
   const now = Date.now();
   if (now - lastShownAt < COOLDOWN_MS && panelEl) {
-    console.log('[pii-shield][panel] cooldown — updating existing panel');
     updatePanelContents(mappings);
     return;
   }
@@ -89,7 +84,6 @@ export function showMappingPanel(mappings: Mapping[]): void {
 
   buildPanelContents(panelEl, mappings);
   document.body.appendChild(panelEl);
-  console.log('[pii-shield][panel] panel appended to body');
 }
 
 function buildPanelContents(panel: HTMLDivElement, mappings: Mapping[]): void {
