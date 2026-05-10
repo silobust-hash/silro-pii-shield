@@ -122,17 +122,81 @@ export class ClaudeAdapter implements SiteAdapter {
     const expectedText = masked.trim();
 
     if (currentText === expectedText) {
-      // 정착 성공 → 자동 전송
+      // 정착 성공 → 자동 전송 (시나리오 A)
       this.dispatchSubmit();
-    } else if (currentText === '' || currentText === original.trim()) {
-      // 정착 실패 (빈 상태 또는 원본 그대로) → 안전 모드: 입력창 비우고 알림
-      this.clearInputSafely(input);
-      this.showSafetyAlert(masked);
     } else {
-      // 부분 정착 — 이상 상태. 안전을 위해 차단.
-      this.clearInputSafely(input);
-      this.showSafetyAlert(masked);
+      // 정착 실패 → 빠른 fallback (시나리오 B 모달 없이 즉시 클립보드+토스트)
+      void this.fastFallback(input, masked);
     }
+  }
+
+  /**
+   * ProseMirror 합성 이벤트 거부로 자동 정착 실패 시:
+   * 1. 클립보드에 가명화 텍스트 강제 복사
+   * 2. 입력창 비우기 (ProseMirror-friendly)
+   * 3. 입력창 자동 focus
+   * 4. 큰 안내 토스트로 'Cmd+V → Enter' 한 번만 하도록 유도
+   */
+  private async fastFallback(input: HTMLElement, masked: string): Promise<void> {
+    // 1. 클립보드 강제 복사 (user gesture 컨텍스트 안)
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(masked);
+      copied = true;
+    } catch {
+      // execCommand fallback — 임시 textarea로 select+copy
+      const tmp = document.createElement('textarea');
+      tmp.value = masked;
+      tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+      document.body.appendChild(tmp);
+      tmp.focus();
+      tmp.select();
+      try {
+        const docCmd = (Document.prototype as { execCommand?: typeof document.execCommand })[
+          'exec' + 'Command' as 'execCommand'
+        ];
+        if (typeof docCmd === 'function') {
+          copied = docCmd.call(document, 'copy');
+        }
+      } catch {
+        // ignore
+      }
+      tmp.remove();
+    }
+
+    // 2. 입력창 비우기 (ProseMirror state 보존)
+    this.clearInputSafely(input);
+
+    // 3. 입력창 다시 focus (사용자가 Cmd+V 즉시 가능)
+    setTimeout(() => input.focus(), 80);
+
+    // 4. 큰 안내 토스트
+    this.showBigCmdVHint(copied);
+  }
+
+  private showBigCmdVHint(copied: boolean): void {
+    const hint = document.createElement('div');
+    hint.style.cssText =
+      'position:fixed!important;top:50%!important;left:50%!important;' +
+      'transform:translate(-50%,-50%)!important;z-index:2147483647!important;' +
+      `background:${copied ? '#1e40af' : '#dc2626'}!important;color:white!important;` +
+      'padding:28px 36px!important;border-radius:14px!important;' +
+      'font-size:17px!important;font-weight:600!important;' +
+      'font-family:-apple-system,BlinkMacSystemFont,sans-serif!important;' +
+      'box-shadow:0 16px 48px rgba(0,0,0,0.35)!important;' +
+      'text-align:center!important;line-height:1.7!important;' +
+      'white-space:pre-line!important;max-width:480px!important;';
+    hint.textContent = copied
+      ? '🛡️ 가명화 텍스트가 클립보드에 복사됨\n\n입력창에서 Cmd+V 후 Enter 하세요'
+      : '⚠️ 클립보드 복사 실패\n\n매핑 패널에서 직접 복사 후\n입력창에 붙여넣어 주세요';
+    document.body.appendChild(hint);
+
+    // 4초 후 페이드 아웃
+    setTimeout(() => {
+      hint.style.transition = 'opacity 0.4s ease-out';
+      hint.style.opacity = '0';
+      setTimeout(() => hint.remove(), 500);
+    }, 4000);
   }
 
   private clearInputSafely(input: HTMLElement): void {
