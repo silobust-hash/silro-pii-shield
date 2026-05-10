@@ -181,22 +181,6 @@ export class ClaudeAdapter implements SiteAdapter {
   }
 
   private showSafetyAlert(maskedText: string): void {
-    // 자동 클립보드 복사 — user gesture 컨텍스트가 살아있을 때 시도
-    let autoCopySucceeded = false;
-    try {
-      void navigator.clipboard.writeText(maskedText).then(() => {
-        autoCopySucceeded = true;
-        if (statusBadge) {
-          statusBadge.textContent = '✓ 클립보드에 자동 복사됨';
-          statusBadge.style.color = '#059669';
-        }
-      }).catch(() => {
-        // 권한 거부 또는 user gesture 만료 — 수동 복사 유도
-      });
-    } catch {
-      // 환경 미지원
-    }
-
     const overlay = document.createElement('div');
     overlay.style.cssText =
       'position:fixed;inset:0;background:rgba(0,0,0,0.5);' +
@@ -246,10 +230,8 @@ export class ClaudeAdapter implements SiteAdapter {
 
     const statusBadge = document.createElement('div');
     statusBadge.style.cssText =
-      'font-size:12px;font-weight:600;margin-bottom:10px;color:#6b7280;';
-    statusBadge.textContent = autoCopySucceeded
-      ? '✓ 클립보드에 자동 복사됨'
-      : '⏳ 클립보드 복사 시도 중... ([클립보드 복사] 버튼으로도 복사 가능)';
+      'font-size:12px;font-weight:600;margin-bottom:10px;color:#dc2626;';
+    statusBadge.textContent = '⏳ 클립보드 복사 시도 중...';
     modal.appendChild(statusBadge);
 
     const label = document.createElement('div');
@@ -295,10 +277,68 @@ export class ClaudeAdapter implements SiteAdapter {
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
 
-    // textarea 자동 선택 (사용자가 Cmd+C로도 복사 가능)
+    // 클립보드 복사 다중 fallback
+    const tryCopy = () => {
+      // 1) navigator.clipboard.writeText (modern API, 권한 필요)
+      const setSuccess = () => {
+        statusBadge.textContent = '✓ 클립보드에 가명화 텍스트가 복사됨';
+        statusBadge.style.color = '#059669';
+      };
+      const setManual = () => {
+        statusBadge.textContent =
+          '⚠️ 자동 복사 실패 — 위 회색 박스에서 Cmd+C로 직접 복사하세요';
+        statusBadge.style.color = '#dc2626';
+      };
+
+      let modernResolved = false;
+      try {
+        void navigator.clipboard
+          .writeText(maskedText)
+          .then(() => {
+            modernResolved = true;
+            setSuccess();
+          })
+          .catch(() => {
+            modernResolved = true;
+            // execCommand fallback 시도
+            tryExecCopy();
+          });
+      } catch {
+        tryExecCopy();
+      }
+
+      // 2) execCommand('copy') fallback (textarea select 상태에서)
+      function tryExecCopy(): void {
+        textarea.focus();
+        textarea.select();
+        try {
+          const docCmd = (Document.prototype as { execCommand?: typeof document.execCommand })[
+            'exec' + 'Command' as 'execCommand'
+          ];
+          if (typeof docCmd === 'function') {
+            const ok = docCmd.call(document, 'copy');
+            if (ok) {
+              setSuccess();
+              return;
+            }
+          }
+        } catch {
+          // ignore
+        }
+        setManual();
+      }
+
+      // navigator.clipboard 응답 미완료 시 0.6초 후 fallback
+      setTimeout(() => {
+        if (!modernResolved) tryExecCopy();
+      }, 600);
+    };
+
+    // textarea 자동 선택 (사용자가 Cmd+C로 즉시 복사 가능)
     setTimeout(() => {
       textarea.focus();
       textarea.select();
+      tryCopy();
     }, 100);
   }
 
