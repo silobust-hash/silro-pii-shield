@@ -10,12 +10,15 @@ let lastShownAt = 0;
 const COOLDOWN_MS = 4000;
 
 const PANEL_STYLE =
-  'position:fixed;top:80px;right:20px;z-index:2147483646;' +
-  'background:white;border:1px solid #d1d5db;border-radius:12px;' +
-  'box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:14px 16px;' +
-  'max-width:380px;max-height:70vh;overflow-y:auto;' +
-  'font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px;' +
-  'animation:pii-shield-slide-in 0.25s ease-out;';
+  'position:fixed!important;top:100px!important;right:20px!important;' +
+  'z-index:2147483647!important;' +
+  'background:white!important;border:3px solid #1e40af!important;border-radius:12px!important;' +
+  'box-shadow:0 12px 32px rgba(0,0,0,0.25)!important;padding:14px 16px!important;' +
+  'width:360px!important;max-width:90vw!important;max-height:70vh!important;overflow-y:auto!important;' +
+  'font-family:-apple-system,BlinkMacSystemFont,sans-serif!important;font-size:13px!important;' +
+  'color:#111827!important;' +
+  'animation:pii-shield-slide-in 0.25s ease-out!important;' +
+  'pointer-events:auto!important;display:block!important;';
 
 const HEADER_STYLE =
   'display:flex;justify-content:space-between;align-items:center;' +

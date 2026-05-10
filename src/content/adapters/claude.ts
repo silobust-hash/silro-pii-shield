@@ -180,6 +180,19 @@ export class ClaudeAdapter implements SiteAdapter {
     // 사용자가 모달 안내에 따라 직접 Cmd+A로 선택 후 Cmd+V로 덮어쓰기 가능.
   }
 
+  private showCmdVHint(): void {
+    const toast = document.createElement('div');
+    toast.style.cssText =
+      'position:fixed;top:20px;left:50%;transform:translateX(-50%);' +
+      'background:#1e40af;color:white;padding:14px 24px;border-radius:8px;' +
+      'z-index:2147483647;font-family:-apple-system,sans-serif;font-size:14px;' +
+      'box-shadow:0 8px 24px rgba(0,0,0,0.3);font-weight:600;';
+    toast.textContent =
+      '✓ 클립보드 복사 완료. 입력창에서 Cmd+A → Cmd+V → Enter 하세요.';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 6000);
+  }
+
   private showSafetyAlert(maskedText: string): void {
     const overlay = document.createElement('div');
     overlay.style.cssText =
@@ -249,29 +262,65 @@ export class ClaudeAdapter implements SiteAdapter {
     modal.appendChild(textarea);
 
     const buttonRow = document.createElement('div');
-    buttonRow.style.cssText = 'display:flex;gap:8px;margin-top:14px;justify-content:flex-end;';
+    buttonRow.style.cssText = 'display:flex;gap:8px;margin-top:14px;justify-content:flex-end;flex-wrap:wrap;';
 
+    // 보조: 클립보드만 복사
     const copyBtn = document.createElement('button');
-    copyBtn.textContent = '클립보드 복사 (수동)';
+    copyBtn.textContent = '클립보드만 복사';
     copyBtn.style.cssText =
-      'padding:8px 16px;border:1px solid #1e40af;background:white;color:#1e40af;' +
+      'padding:8px 16px;border:1px solid #d1d5db;background:white;color:#374151;' +
       'border-radius:6px;cursor:pointer;font-size:13px;';
     copyBtn.addEventListener('click', () => {
-      void navigator.clipboard.writeText(maskedText).then(() => {
-        copyBtn.textContent = '✓ 복사됨';
-        statusBadge.textContent = '✓ 클립보드에 복사됨';
-        statusBadge.style.color = '#059669';
-      });
+      void navigator.clipboard
+        .writeText(maskedText)
+        .then(() => {
+          copyBtn.textContent = '✓ 복사됨';
+          statusBadge.textContent = '✓ 클립보드 복사 완료. 입력창에서 Cmd+A → Cmd+V → Enter';
+          statusBadge.style.color = '#059669';
+        })
+        .catch(() => {
+          textarea.focus();
+          textarea.select();
+        });
     });
     buttonRow.appendChild(copyBtn);
 
+    // 보조: 닫기
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '닫기';
     closeBtn.style.cssText =
-      'padding:8px 16px;border:0;background:#1e40af;color:white;' +
+      'padding:8px 16px;border:1px solid #d1d5db;background:white;color:#374151;' +
       'border-radius:6px;cursor:pointer;font-size:13px;';
     closeBtn.addEventListener('click', () => overlay.remove());
     buttonRow.appendChild(closeBtn);
+
+    // PRIMARY: 입력창에 직접 자동 입력 + 전송 (user gesture 컨텍스트 활용)
+    const autoSendBtn = document.createElement('button');
+    autoSendBtn.textContent = '🛡️ 입력창에 자동 입력 + 전송';
+    autoSendBtn.style.cssText =
+      'padding:10px 20px;border:0;background:#1e40af;color:white;' +
+      'border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;';
+    autoSendBtn.addEventListener('click', () => {
+      overlay.remove();
+      const input = this.findInputElement();
+      if (!input) return;
+      // user gesture 컨텍스트 안 — ProseMirror가 paste를 인식할 가능성 ↑
+      // 클립보드도 동시 복사 (Cmd+V fallback 보장)
+      void navigator.clipboard.writeText(maskedText).catch(() => {});
+      // 입력창 정착 시도 (4-tier fallback 재실행)
+      this.replaceInputContent(input, maskedText);
+      setTimeout(() => {
+        const currentText = (input.innerText ?? '').trim();
+        if (currentText === maskedText.trim()) {
+          // 정착 성공 → 자동 전송
+          this.dispatchSubmit();
+        } else {
+          // 여전히 실패 → 클립보드는 확실히 복사됐으니 사용자 안내
+          this.showCmdVHint();
+        }
+      }, 250);
+    });
+    buttonRow.appendChild(autoSendBtn);
 
     modal.appendChild(buttonRow);
     overlay.appendChild(modal);
