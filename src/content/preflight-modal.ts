@@ -114,27 +114,31 @@ export function showPreflight(opts: {
     };
     cancelBtn.addEventListener('click', () => cleanup('cancel'));
     sendBtn.addEventListener('click', () => {
-      // ⚡ 사용자 클릭 시점에 즉시 클립보드 복사
-      // (user gesture 컨텍스트 안 — 100% 작동 보장)
-      // 자동 정착 실패 시 fallback에서 사용자가 Cmd+V만 누르면 됨.
-      void navigator.clipboard.writeText(opts.masked).catch(() => {
-        // execCommand fallback (보이지 않는 textarea로 select+copy)
-        const tmp = document.createElement('textarea');
-        tmp.value = opts.masked;
-        tmp.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
-        document.body.appendChild(tmp);
-        tmp.focus();
-        tmp.select();
-        try {
-          const docCmd = (Document.prototype as { execCommand?: typeof document.execCommand })[
-            'exec' + 'Command' as 'execCommand'
-          ];
-          if (typeof docCmd === 'function') docCmd.call(document, 'copy');
-        } catch {
-          // ignore
-        }
-        tmp.remove();
-      });
+      // ⚡ 사용자 클릭 시점에 sync로 클립보드 복사 (user gesture context 보장)
+      // 1) execCommand('copy') 먼저 — sync 호출이라 gesture 만료 위험 0
+      const tmp = document.createElement('textarea');
+      tmp.value = opts.masked;
+      tmp.style.cssText =
+        'position:fixed!important;left:0!important;top:0!important;' +
+        'width:1px!important;height:1px!important;opacity:0!important;' +
+        'pointer-events:none!important;';
+      document.body.appendChild(tmp);
+      tmp.focus();
+      tmp.select();
+      tmp.setSelectionRange(0, opts.masked.length);
+      try {
+        const docCmd = (Document.prototype as { execCommand?: typeof document.execCommand })[
+          'exec' + 'Command' as 'execCommand'
+        ];
+        if (typeof docCmd === 'function') docCmd.call(document, 'copy');
+      } catch {
+        // ignore
+      }
+      tmp.remove();
+
+      // 2) navigator.clipboard.writeText 보조 (modern API, 일부 환경에서 우선)
+      void navigator.clipboard.writeText(opts.masked).catch(() => {});
+
       cleanup('send');
     });
   });
