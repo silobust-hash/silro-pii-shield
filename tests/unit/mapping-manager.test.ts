@@ -40,6 +40,11 @@ describe('MappingManager.mask', () => {
   it('카테고리별 카운터가 독립이다', () => {
     expect(manager.mask('900101-1234567 010-1111-1111 920202-2345678 010-2222-2222').masked).toBe('[주민번호-1] [전화-1] [주민번호-2] [전화-2]');
   });
+  it('pendingNames 필드를 포함한다', () => {
+    const result = manager.mask('900101-1234567');
+    expect(result).toHaveProperty('pendingNames');
+    expect(Array.isArray(result.pendingNames)).toBe(true);
+  });
 });
 
 describe('MappingManager.unmask', () => {
@@ -101,5 +106,27 @@ describe('MappingManager — dict aliasOverride', () => {
     const { masked } = mgr.mask('홍 대표 두 번째 문장');
     // 홍 대표는 HONG_ENTRY의 별칭 → 같은 alias "A씨"
     expect(masked).toContain('A씨');
+  });
+});
+
+describe('maskNames', () => {
+  it('replaces all occurrences of provided names', () => {
+    const manager = new MappingManager('conv-test', new PIIDetector());
+    const { masked } = manager.maskNames('홍길동씨와 홍길동님이 방문했다', ['홍길동']);
+    expect(masked).toBe('A씨씨와 A씨님이 방문했다');
+  });
+
+  it('assigns sequential aliases for multiple names', () => {
+    const manager = new MappingManager('conv-test2', new PIIDetector());
+    const { masked } = manager.maskNames('홍길동과 김철수', ['홍길동', '김철수']);
+    expect(masked).toContain('씨');
+    expect(masked).not.toContain('홍길동');
+    expect(masked).not.toContain('김철수');
+  });
+
+  it('returns empty pendingNames', () => {
+    const manager = new MappingManager('conv-test3', new PIIDetector());
+    const result = manager.maskNames('홍길동', ['홍길동']);
+    expect(result.pendingNames).toHaveLength(0);
   });
 });

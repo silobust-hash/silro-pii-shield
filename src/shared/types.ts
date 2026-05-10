@@ -19,9 +19,19 @@ export type Mapping = {
   alias: string;
 };
 
+// Layer 3 pending match (requires user confirm before masking)
+export type PendingKoreanNameMatch = {
+  original: string;
+  start: number;
+  end: number;
+  confidence: number;
+  contextSnippet: string;
+};
+
 export type MaskResult = {
   masked: string;
   mappings: Mapping[];
+  pendingNames: PendingKoreanNameMatch[];  // confidence ≥ 0.7, user confirm 대기
 };
 
 export type ConversationMappings = {
@@ -70,6 +80,22 @@ export type ExtendedPiiMatch = {
   aliasOverride?: string;    // dict entry가 제공하는 고정 alias
 };
 
+// ── Client Profile ───────────────────────────────────────────────────────────
+
+export type ClientProfile = {
+  id: string;                      // uuid v4 (crypto.randomUUID())
+  name: string;                    // "홍길동 사건", "A사 부당해고" 등 사용자 지정 이름
+  mappings: ConversationMappings;  // forward/reverse 매핑 + counters
+  notes: string;                   // 자유 메모 (사건번호, 법원명 등)
+  createdAt: number;               // Unix ms
+  updatedAt: number;               // Unix ms
+};
+
+export type HybridModeSetting = {
+  hostname: string;                // 'claude.ai' | 'chatgpt.com' | 'gemini.google.com' | 'perplexity.ai'
+  mode: 'round-trip' | 'hybrid';  // round-trip: 자동 복원 ON, hybrid: 사이드패널 복원 ON/OFF
+};
+
 // ── Message Protocol ─────────────────────────────────────────────────────────
 
 export type MessageType =
@@ -81,8 +107,16 @@ export type MessageType =
   | { type: 'UPSERT_DICT_ENTRY'; entry: UserDictEntry }
   | { type: 'DELETE_DICT_ENTRY'; id: string }
   | { type: 'GET_SITE_SETTINGS' }
-  | { type: 'SET_SITE_SETTINGS'; siteKey: SiteKey; settings: SiteSettings };
+  | { type: 'SET_SITE_SETTINGS'; siteKey: SiteKey; settings: SiteSettings }
+  // v0.3 신규
+  | { type: 'LIST_PROFILES' }
+  | { type: 'GET_PROFILE'; profileId: string }
+  | { type: 'SAVE_PROFILE'; profile: ClientProfile }
+  | { type: 'DELETE_PROFILE'; profileId: string }
+  | { type: 'GET_HYBRID_MODE'; hostname: string }
+  | { type: 'SET_HYBRID_MODE'; setting: HybridModeSetting }
+  | { type: 'MASK_NAMES'; conversationId: string; text: string; names: string[] };
 
 export type MessageResponse =
-  | { ok: true; data: MaskResult | string | void | ConversationMappings | UserDictEntry[] | AllSiteSettings }
+  | { ok: true; data: MaskResult | string | void | ConversationMappings | UserDictEntry[] | AllSiteSettings | ClientProfile | ClientProfile[] | 'round-trip' | 'hybrid' }
   | { ok: false; error: string };
