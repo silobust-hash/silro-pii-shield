@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.2.0] — 2026-05-10
+
+### Added
+- ChatGPT (chatgpt.com) SiteAdapter — ProseMirror contenteditable 지원
+- Gemini (gemini.google.com) SiteAdapter — Quill 에디터 + Shadow DOM fallback
+- Perplexity (perplexity.ai) SiteAdapter — 표준 textarea, NativeInputValueSetter
+- UserDictEntry 타입 + DictCategory (person/company/hospital/department/custom)
+- DictionaryDetector (Layer 2) — 패턴 매칭, 긴 매치 우선, caseInsensitive 옵션
+- PIIDetector Layer 2 통합 — dict 우선, regex 폴백, 겹침 해소
+- MappingManager aliasOverride 지원 — dict entry 고정 가명 사용
+- unmask 동적 역패턴 — dict alias 포함 역치환
+- dictStore (chrome.storage.local) — 영구 사전 CRUD
+- siteSettingsStore (chrome.storage.sync) — 사이트별 활성/비활성 (기본: 활성)
+- chrome.runtime 신규 메시지: GET_MAPPINGS, GET_DICT, UPSERT_DICT_ENTRY, DELETE_DICT_ENTRY, GET_SITE_SETTINGS, SET_SITE_SETTINGS
+- 사이드패널 (Manifest V3 side_panel API) — 매핑 조회, 사전 관리, 사이트 토글
+- 옵션 페이지 — 사전 CRUD 테이블, 사이트별 설정
+- E2E smoke 3개 (ChatGPT/Gemini/Perplexity) — RUN_REAL_SITE_TESTS 환경변수 게이트
+
+### Changed
+- manifest.json: v0.2.0, 4-site content_scripts, host_permissions 4개, sidePanel+activeTab 권한, options_page
+- content-main.ts: 4개 어댑터 라우팅, siteSettings 비활성 게이트, dict alias unmask 정규식 확장
+- shared/types.ts: ExtendedPiiMatch, SiteKey, AllSiteSettings, MessageType 확장, Mapping.category → AnyCategory
+- detector.ts: PIIDetector(dictDetector?) 선택적 인자, Layer 2 체이닝
+
+### Security
+- host_permissions 3개 추가 (chatgpt.com, gemini.google.com, perplexity.ai) — 외 도메인 0 유지
+- innerHTML/insertAdjacentHTML/outerHTML 사이드패널·옵션 페이지에서도 계속 금지
+- dict 데이터 chrome.storage.local 저장 — 외부 전송 없음
+
 ## [0.1.0] - 2026-05-10 (alpha)
 
 ### Added

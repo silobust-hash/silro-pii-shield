@@ -14,7 +14,8 @@
     "types": ["chrome", "vitest/globals"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@tests/*": ["tests/*"]
     }
   },
   "include": ["src/**/*", "tests/**/*"]
