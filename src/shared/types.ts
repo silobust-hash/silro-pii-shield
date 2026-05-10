@@ -176,3 +176,16 @@ export interface FileMaskingSettings {
   reconstructionMode: ReconstructionMode;  // 기본값: 'txt'
   maxFileSizeBytes: number;                // 기본값: 100 * 1024 * 1024 (100MB)
 }
+
+// ── v1.0: Encrypted storage types ─────────────────────────────────────────────
+
+export type { EncryptedBlob } from '../background/crypto';
+
+export type ExportPayload = {
+  version: '1.0';
+  exportedAt: number;          // Unix timestamp (ms)
+  encrypted: boolean;
+  userDictionary: unknown;     // UserDictEntry[] or EncryptedBlob
+  profiles: unknown;           // ClientProfile[] or EncryptedBlob
+  settings: Record<string, unknown>;
+};
