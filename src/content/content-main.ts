@@ -3,13 +3,14 @@ import { ChatGPTAdapter } from './adapters/chatgpt';
 import { GeminiAdapter } from './adapters/gemini';
 import { PerplexityAdapter } from './adapters/perplexity';
 import { showPreflight } from './preflight-modal';
+import { showKoreanNameConfirm } from './confirm-dialog';
 import { sendMessage } from '@/shared/messaging';
 import type { MaskResult, SiteKey } from '@/shared/types';
 import type { SiteAdapter } from './adapters/base';
 
 // dict alias 패턴도 포함: [주민번호-1], A씨, 회사1, 병원1, 부서1
 const ALIAS_DETECTION_REGEX =
-  /\[(?:주민번호|전화|이메일|사업자번호|사건)-\d+\]|[A-Z씨]{1,3}씨|회사\d+|병원\d+|부서\d+/;
+  /\[(?:주민번호|전화|이메일|사업자번호|사건)-\d+\]|[A-Z]+씨|회사\d+|병원\d+|부서\d+/;
 
 type AdapterMap = Partial<Record<string, SiteAdapter>>;
 
@@ -28,7 +29,7 @@ const INPUT_SELECTORS: Record<string, string> = {
 };
 
 (async function init() {
-  const hostname = location.hostname;
+  const hostname = location.hostname.replace(/^www\./, '');
   const adapter = ADAPTERS[hostname];
   if (!adapter) return;
 
@@ -48,6 +49,18 @@ const INPUT_SELECTORS: Record<string, string> = {
     // 설정 로드 실패 시 기본값(활성)으로 진행
   }
 
+  // 사이트별 모드 조회
+  let mode: 'round-trip' | 'hybrid' = 'round-trip';
+  try {
+    const modeResponse = await sendMessage<'round-trip' | 'hybrid'>({
+      type: 'GET_HYBRID_MODE',
+      hostname,
+    });
+    mode = modeResponse ?? 'round-trip';
+  } catch {
+    // 기본값 유지
+  }
+
   // input element 준비 대기
   const inputSelector = INPUT_SELECTORS[hostname] ?? 'textarea';
   await waitForElement(inputSelector, 12000).catch(() => {
@@ -59,32 +72,57 @@ const INPUT_SELECTORS: Record<string, string> = {
     console.warn(`[pii-shield] selfTest failed on ${hostname}:`, test.reason);
     return;
   }
-  console.log(`[pii-shield] active on ${hostname}`);
+  console.log(`[pii-shield] active on ${hostname} — mode: ${mode}`);
 
   adapter.hookSubmit(async (originalText: string) => {
     const conversationId = adapter.getConversationId();
+
+    // 1. Layer 1/2 마스킹
     const result = await sendMessage<MaskResult>({
       type: 'MASK_TEXT',
       conversationId,
       text: originalText,
     });
-    if (result.mappings.length === 0) {
+
+    // 2. Layer 3 pending names confirm
+    let finalMasked = result.masked;
+    if (result.pendingNames && result.pendingNames.length > 0) {
+      const { confirmed } = await showKoreanNameConfirm(result.pendingNames);
+      if (confirmed.length > 0) {
+        // confirmed names를 추가 마스킹
+        const additionalResult = await sendMessage<MaskResult>({
+          type: 'MASK_NAMES',
+          conversationId,
+          text: finalMasked,
+          names: confirmed.map((n) => n.original),
+        });
+        finalMasked = additionalResult.masked;
+      }
+    }
+
+    if (result.mappings.length === 0 && (!result.pendingNames || result.pendingNames.length === 0)) {
       return originalText;
     }
+
     const decision = await showPreflight({
       original: originalText,
-      masked: result.masked,
+      masked: finalMasked,
       mappings: result.mappings,
     });
+
     if (decision === 'cancel') {
       throw new Error('User cancelled');
     }
-    return result.masked;
+    return finalMasked;
   });
 
-  adapter.observeResponses((node) => {
-    void replaceTextInNode(node, adapter.getConversationId());
-  });
+  // Round-trip 모드에서만 응답 자동 복원
+  if (mode === 'round-trip') {
+    adapter.observeResponses((node) => {
+      void replaceTextInNode(node, adapter.getConversationId());
+    });
+  }
+  // Hybrid 모드: 사이드패널에서 수동 복원 (observeResponses 등록 안 함)
 })();
 
 function waitForElement(selector: string, timeout: number): Promise<HTMLElement> {
