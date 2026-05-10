@@ -1,26 +1,65 @@
 import { ClaudeAdapter } from './adapters/claude';
+import { ChatGPTAdapter } from './adapters/chatgpt';
+import { GeminiAdapter } from './adapters/gemini';
+import { PerplexityAdapter } from './adapters/perplexity';
 import { showPreflight } from './preflight-modal';
 import { sendMessage } from '@/shared/messaging';
-import type { MaskResult } from '@/shared/types';
+import type { MaskResult, SiteKey } from '@/shared/types';
+import type { SiteAdapter } from './adapters/base';
 
+// dict alias 패턴도 포함: [주민번호-1], A씨, 회사1, 병원1, 부서1
 const ALIAS_DETECTION_REGEX =
-  /\[(?:주민번호|전화|이메일|사업자번호|사건)-\d+\]/;
+  /\[(?:주민번호|전화|이메일|사업자번호|사건)-\d+\]|[A-Z씨]{1,3}씨|회사\d+|병원\d+|부서\d+/;
+
+type AdapterMap = Partial<Record<string, SiteAdapter>>;
+
+const ADAPTERS: AdapterMap = {
+  'claude.ai': new ClaudeAdapter(),
+  'chatgpt.com': new ChatGPTAdapter(),
+  'gemini.google.com': new GeminiAdapter(),
+  'perplexity.ai': new PerplexityAdapter(),
+};
+
+const INPUT_SELECTORS: Record<string, string> = {
+  'claude.ai': 'div[contenteditable="true"]',
+  'chatgpt.com': 'div#prompt-textarea',
+  'gemini.google.com': 'rich-textarea',
+  'perplexity.ai': 'textarea[placeholder*="Ask"]',
+};
 
 (async function init() {
-  if (location.hostname !== 'claude.ai') return;
+  const hostname = location.hostname;
+  const adapter = ADAPTERS[hostname];
+  if (!adapter) return;
 
-  const adapter = new ClaudeAdapter();
+  const siteKey = hostname as SiteKey;
 
-  await waitForElement('div[contenteditable="true"]', 10000).catch(() => {
-    console.warn('[pii-shield] input not ready');
+  // siteSettings 게이트 — 비활성이면 조용히 종료
+  try {
+    const settings = await sendMessage<Record<string, { enabled: boolean }>>({
+      type: 'GET_SITE_SETTINGS',
+    });
+    const enabled = (settings as Record<string, { enabled: boolean }>)[siteKey]?.enabled ?? true;
+    if (!enabled) {
+      console.log(`[pii-shield] disabled for ${hostname}`);
+      return;
+    }
+  } catch {
+    // 설정 로드 실패 시 기본값(활성)으로 진행
+  }
+
+  // input element 준비 대기
+  const inputSelector = INPUT_SELECTORS[hostname] ?? 'textarea';
+  await waitForElement(inputSelector, 12000).catch(() => {
+    console.warn(`[pii-shield] input not ready on ${hostname}`);
   });
 
   const test = adapter.selfTest();
   if (!test.ok) {
-    console.warn('[pii-shield] selfTest failed:', test.reason);
+    console.warn(`[pii-shield] selfTest failed on ${hostname}:`, test.reason);
     return;
   }
-  console.log('[pii-shield] active on claude.ai');
+  console.log(`[pii-shield] active on ${hostname}`);
 
   adapter.hookSubmit(async (originalText: string) => {
     const conversationId = adapter.getConversationId();
